@@ -158,3 +158,22 @@ Consequences: query API gains `pattern-owner`, `pipeline-builder`, `attribute` (
 workflow consumers from Phase 5 dossiers); INDEXER_VERSION bumps force one full re-index.
 Remaining: value-level attribute semantics and non-RewritePatternSet builder indirection
 stay unmodeled (documented, low impact).
+
+## ADR-013 (2026-09-05, accepted) — Workflows consume provenance queries; no engine growth
+
+Context: Phase 6 built the provenance surface; Phase 7 asked whether agents *consistently
+use* it. The three workflows were upgraded to mandate `pattern-owner`, `attribute`, and
+`pipeline-builder` (pass-analysis steps 5b/7b, pipeline-audit provenance chain + swap
+outcomes, repo-map provenance maps), then re-executed on AscendNPU-IR.
+Decision: keep the engine at the Phase 6 surface — **no new query type was needed**; the
+phase's engine changes were small workflow-driven fixes (pattern-owner upward walk,
+`k*Attr` idiom capture, CREATES_ATTRIBUTE downgraded to inferred, qualified-id None-guard).
+Dossier output now requires: ownership path with per-hop evidence ("Pass uses Pattern X"
+alone is invalid), attribute contract or an explicit "graph-confirmed none", and
+builder-context justification for pipeline position. Zero-pattern and zero-attribute
+claims must be stated as graph-confirmed, not left empty.
+Evidence: docs/validation/phase7/ — all six analyses and the regbase audit consumed the
+new queries; pattern-map.md (142 chains / 190 confirmed-zero) and attribute-map.md
+(86 attrs, 43 with creators) generated from the workflow.
+Consequences: query cost per analysis rises to ~6-10 queries (still far below grep);
+creator-side attribute semantics remains `inferred` (RG-1) and is the top remaining gap.

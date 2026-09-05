@@ -32,16 +32,39 @@ query would have answered it (feeds the query-API review).
 1. **Pass identity** — arg, td class, summary, cpp class; note which identity came from
    evidence vs heuristic.
 2. **Registration** — `let constructor` factory, any PassRegistration, option definitions.
-3. **Pipeline position** — every membership: pipeline, scope (`module` / `nest<Op>`), order,
-   guard. Derive predecessor/successor per membership and what the guard means semantically.
+3. **Pipeline position** — every membership: pipeline, scope (`module` / `nest<Op>`), order
+   and cross-scope `seq`, guard. Derive predecessor/successor per membership and what the
+   guard means semantically. For each membership pipeline, run
+   `mlir-repomap pipeline-builder <pipeline>` and record: builder function (file:line),
+   call sites, nested builders, and the insertion site of this pass in the builder body —
+   "why this pass sits here" must reference the builder source, not just the order number.
 4. **Input invariant** — what IR shape the pass assumes (op set, attribute presence, analysis
    validity, canonical forms). Evidence: pred passes + code guards + test inputs.
 5. **Analysis dependencies** — `getAnalysis<>`, ` depend on computed state` (e.g.
    decomposePhase enum set by earlier passes — flag cross-pass state as an audit risk).
+
+5b. **Attribute contract** — if the pass creates, consumes, or is gated by IR attributes
+   (annotations, metadata, markers): for each attribute run
+   `mlir-repomap attribute <Name>Attr`. Output the full contract: Producer (confirmed
+   creator) → attribute → Consumers (referencing files/passes) → attachment relation →
+   evidence. If the producer/consumer pair crosses pipelines, state it as a pipeline
+   contract in the dossier. A pass with no attribute hits must record
+   "no attribute contract (graph-confirmed)" rather than leaving the section empty.
 6. **Core transformation algorithm** — the actual algorithm at the level a reviewer needs:
    data structures, iteration order, cost heuristics. Cite `file:line` for each claim.
 7. **Output invariant** — what the pass guarantees afterwards; what downstream passes
    rely on (successor passes + their input handling).
+
+7b. **Pattern provenance** — if the pass registers rewrite patterns (direct or via
+   populator chains): for each pattern run `mlir-repomap pattern-owner <Pattern>` and
+   document the **ownership path**: Pass → populator function (file:line, call site) →
+   intermediate helpers → `patterns.add` site → pattern class → matched/created ops.
+   Every hop carries evidence and confidence (confirmed = call-site + definition on the
+   chain; inferred = resolved by naming convention or locality heuristic with the
+   `disambiguation` flag visible). "Pass uses Pattern X" is never an acceptable
+   statement by itself — the dossier must answer *why X belongs to this pass*. A pass
+   with zero patterns must state "registers no rewrite patterns (graph-confirmed)"
+   instead of an empty list.
 8. **Downstream dependency** — successor passes, pipelines, later stages keyed on flags
    set by this pass (search the dossier's pipeline neighborhood for the flag/enum).
 9. **Supported scenarios** — IR topologies the pass handles; ground each in a test or code path.
@@ -89,5 +112,7 @@ Header provenance block: repo HEAD, RepoMap index version, analysis date, primar
 
 ## Budget discipline
 
-A pass analysis should need: 1 `repo pass` query + 1–3 `pipeline`/`tests` queries + reading
-≤5 files pointed to by evidence. If you exceed this, the gap is an engine finding — record it.
+A pass analysis should need: 1 `repo pass` query + 1–3 `pipeline`/`tests` queries +
+1 `pipeline-builder` per membership pipeline + 1 `pattern-owner` per registered pattern +
+1 `attribute` per attribute contract + reading ≤5 files pointed to by evidence. If you
+exceed this, the gap is an engine finding — record it.

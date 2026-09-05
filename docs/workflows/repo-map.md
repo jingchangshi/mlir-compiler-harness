@@ -18,7 +18,8 @@ Scope guard: this workflow maps architecture. It does NOT do per-pass correctnes
 
 - Input: repository root with an initialized RepoMap index (`.mlir-repomap/`).
 - Output: `docs/compiler-architecture/` in the target repository:
-  `README.md`, `repository-map.md`, `dialect-map.md`, `pipeline-map.md`, `pass-catalog.md`.
+  `README.md`, `repository-map.md`, `dialect-map.md`, `pipeline-map.md`, `pass-catalog.md`,
+  `pattern-map.md`, `attribute-map.md` (provenance maps, Phase 7).
 
 ## Procedure
 
@@ -48,6 +49,17 @@ Scope guard: this workflow maps architecture. It does NOT do per-pass correctnes
    If evidence contradicts the graph, treat it as an engine bug: record it in the output
    document's "Provenance & caveats" section and file an issue in the harness repo — do not
    silently fix the doc by hand.
+
+6b. **Provenance maps** — aggregate the graph's provenance layer:
+   - `pattern-map.md`: for each pass with registered patterns, the ownership chain
+     (pass → populator function → pattern), with confidence and the `disambiguation`
+     flags where locality heuristics were applied; passes confirmed to register no
+     patterns are listed as such.
+   - `attribute-map.md`: for each `attribute:<Name>` entity, producers (confirmed
+     creators) and consumers (referencing files/passes) — the cross-pass attribute
+     contract inventory.
+   Both maps are generated from RepoMap queries (CLI or QueryService); hand-edits follow
+   the `<!-- human-note -->` rule below.
 
 7. **Generate human docs** into `docs/compiler-architecture/`:
    - `README.md` — how this dir was produced (workflow, HEAD, index version, date) and how to refresh;

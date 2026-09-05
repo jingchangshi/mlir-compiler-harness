@@ -222,6 +222,9 @@ class QueryService:
         if name.startswith("pipeline:"):
             node = self._node_or_none(name)
             nid = name
+            if node is None:
+                # fall through to name-based resolution on the bare name
+                name = name.rsplit(":", 1)[-1]
         else:
             exact = [p for p in self.store.nodes_by_kind(model.PIPELINE)
                      if p["name"] == name]
@@ -238,6 +241,8 @@ class QueryService:
                     return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
                 else:
                     return {"error": "not found"}
+            if node is None:
+                return {"error": "not found"}
         stages = []
         for e in self._evidence_summary(self.store.edges_from(nid, model.PIPELINE_CONTAINS)):
             stage = {"pass": e["dst"], "order": e["props"].get("order"),
@@ -335,10 +340,22 @@ class QueryService:
                 self.store.edges_to(pat, model.FUNCTION_DEFINES_PATTERN)):
             fid = e["src"]
             fn = self._node_or_none(fid) or {"id": fid}
-            passes = [x["src"] for x in self.store.edges_to(fid, model.PASS_USES_PATTERN_POPULATOR)]
-            callers = [x["src"] for x in self.store.edges_to(fid, model.FUNCTION_CALLS)]
+            # walk the call chain upward: passes use this function directly or via helpers
+            passes, called_by, seen = [], [], set()
+
+            def walk_up(f):
+                if f in seen:
+                    return
+                seen.add(f)
+                for x in self.store.edges_to(f, model.PASS_USES_PATTERN_POPULATOR):
+                    passes.append({"src": x["src"], "evidence": x["evidence"]})
+                for x in self.store.edges_to(f, model.FUNCTION_CALLS):
+                    called_by.append(x["src"])
+                    walk_up(x["src"])
+
+            walk_up(fid)
             owners.append({"function": fid, "node": fn, "evidence": e["evidence"],
-                           "passes": passes, "called_by": callers})
+                           "passes": passes, "called_by": called_by})
         direct = self._evidence_summary(self.store.edges_to(pat, model.PASS_USES_PATTERN))
         return {"pattern": node, "populators": owners,
                 "direct_uses": [{"src": e["src"], "evidence": e["evidence"]}

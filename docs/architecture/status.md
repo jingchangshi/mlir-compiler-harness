@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–6 complete)
+Updated: 2026-09-05 (Phases 0–7 complete)
 
 ## Implemented
 
@@ -45,6 +45,11 @@ remains (`populate*` chasing) and did not block the workflows.
   chains by signature (FlattenOps heuristic→confirmed); attribute entities
   (StrideAlignDimsAttr chain = one query); `seq` ordering; test feature tags. New
   queries: `pattern-owner`, `pipeline-builder`, `attribute`.
+
+- Phase 7 provenance-aware workflow intelligence (ADR-013, `docs/validation/phase7/`):
+  workflows mandate pattern-owner/attribute/pipeline-builder; provenance maps generated
+  (pattern-map.md, attribute-map.md); regbase audit re-run with builder chains and swap
+  outcomes; no new query type needed.
 
 ## Current limitations
 

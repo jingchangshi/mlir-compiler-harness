@@ -80,17 +80,21 @@ def extract(relpath, text):
                       "kind": model.REFERENCES, "props": {"via": "PassRegistration"},
                       "evidence": ev(ln)})
 
-    # IR attribute name references (QG-4): `XxxAttr::name` -> attribute entity
-    RE_ATTR_NAME = re.compile(r'\b(\w+Attr)::name')
+    # IR attribute name references (QG-4): `XxxAttr::name` and `kXxxAttr` constants
     attr_hits = {}
-    for m in RE_ATTR_NAME.finditer(text):
+    for m in re.finditer(r'\b(\w+Attr)::name', text):
         nm = m.group(1)
         ln = line_of(m.start())
         attr_hits.setdefault(nm, ln)
+    for m in re.finditer(r'\bk([A-Z]\w*Attr)\b', text):
+        nm = m.group(1)
+        ln = line_of(m.start())
+        attr_hits.setdefault(nm, ln)
+    for nm, ln in sorted(attr_hits.items()):
         nodes.append({"id": f"attribute:{nm}", "kind": model.ATTRIBUTE, "name": nm,
                       "summary": "", "file": relpath, "line": ln})
         edges.append({"src": f"file:{relpath}", "dst": f"attribute:{nm}",
-                      "kind": model.REFERENCES, "props": {"via": "Attr::name"},
+                      "kind": model.REFERENCES, "props": {"via": "Attr-ref"},
                       "evidence": ev(ln)})
     # attribute created inside a pass class body -> CREATES_ATTRIBUTE (inferred)
     for m in RE_PASS_CLASS.finditer(text):
@@ -100,8 +104,9 @@ def extract(relpath, text):
         for nm in attr_hits:
             if nm in body:
                 edges.append({"src": f"pass_class:{cls}", "dst": f"attribute:{nm}",
-                              "kind": model.CREATES_ATTRIBUTE, "props": {},
-                              "evidence": ev(ln)})
+                              "kind": model.CREATES_ATTRIBUTE,
+                              "props": {},
+                              "evidence": {**ev(ln), "confidence": model.INFERRED}})
 
     # analysis classes (name-level only, MVP limitation)
     for m in RE_ANALYSIS.finditer(text):

@@ -1,17 +1,20 @@
 # Roadmap
 
-done: Phase 0 (contract) · Phase 1 (MVP engine) · Phase 2 (validation) · Phase 3
-(workflows; ADR-009) · Phase 4 (agent adapters; ADR-010) · Phase 5 (deep validation;
-ADR-011) · Phase 6 (provenance-aware graph; ADR-012, docs/validation/phase6/).
+done: Phase 0-7 (contract, engine, validation, workflows, adapters, deep validation,
+provenance graph, provenance-aware workflows; ADR-001..013).
 
 current: none.
 
-next (based on Phase 6 evidence):
-1. **Workflow refinements** (fold WG-1..5 + provenance-query guidance into docs/workflows):
-   the graph now answers questions the workflows don't yet instruct agents to ask
-   (`pattern-owner`, `attribute`).
-2. **Multi-repo adapter hardening**: run DeepSeek/ZCode adapters on a second MLIR repo to
-   prove the provenance graph is not AscendNPU-IR-shaped.
+next (based on Phase 7 evidence):
+1. **Second MLIR repository validation** (recommended next): Phase 7 proved the workflow
+   layer on AscendNPU-IR; the untested risk is AscendNPU-IR-shaped extraction. A second
+   repo (e.g. an upstream-MLIR-based compiler or triton fork) would exercise the generic
+   core against different idioms — the same move that made Phases 2/5 decisive here.
+2. **RG-1 attribute-creator tracing** (small): marker-construction call-site extractor
+   (setAttr/createAlignMarkOp paths) to upgrade CREATES_ATTRIBUTE beyond inferred.
+
+deferred (unchanged): MCP — no hot-path pressure through Phase 7; clangd — no wrong-fact
+incident through Phase 7; attribute value semantics — RG-1 does not require it yet.
 
 deferred (unchanged, evidence-based): MCP — no hot-path pressure through Phase 6; clangd —
 no wrong-fact incident through Phase 6; the remaining name-level attribute semantics and

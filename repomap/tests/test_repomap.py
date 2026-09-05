@@ -111,7 +111,8 @@ class FixtureTest(unittest.TestCase):
         own = self.svc.pattern_owner("FoldSimplePattern")
         self.assertTrue(any("populateSimpleFoldPatterns" in o["function"]
                             for o in own["populators"]))
-        self.assertTrue(any("pass:simple-fold" in o["passes"] for o in own["populators"]))
+        self.assertTrue(any(any("pass:simple-fold" == p["src"] for p in o["passes"])
+                            for o in own["populators"]))
 
     def test_same_name_pipeline_builders_not_merged(self):
         r = self.svc.get_pipeline("buildSimplePipeline")
