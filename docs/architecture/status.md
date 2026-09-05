@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–5 complete)
+Updated: 2026-09-05 (Phases 0–6 complete)
 
 ## Implemented
 
@@ -40,9 +40,16 @@ remains (`populate*` chasing) and did not block the workflows.
   audit, all produced through the ZCode skills. Outcome: no hard blockers; gaps logged
   (QG-1..6, WG-1..5) and ranked in ADR-011.
 
+- Phase 6 provenance-aware graph (ADR-012, `docs/validation/phase6/`): pipeline
+  identity = file-qualified (dual `alignStoragePipeline` unmerged); pattern-population
+  chains by signature (FlattenOps heuristic→confirmed); attribute entities
+  (StrideAlignDimsAttr chain = one query); `seq` ordering; test feature tags. New
+  queries: `pattern-owner`, `pipeline-builder`, `attribute`.
+
 ## Current limitations
 
-- `populateXxxPatterns()` free-function chasing still missing (139/79 coverage, not 332/332).
+- Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
+  is name-level (no per-op attachment).
 - Pipeline detection is signature-based; some entry functions (e.g. `runRegBaseCompile`) missed.
 - Op extraction covers direct defs and one-level multiclass aliases.
 - Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).

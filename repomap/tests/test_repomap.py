@@ -45,23 +45,33 @@ class FixtureTest(unittest.TestCase):
         self.assertNotIn("error", r)
         self.assertTrue(any(e["src"].endswith(".td") for e in r["definition"]))
         self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
-        mem = {m["scope"]: m for m in r["pipeline_memberships"]}
+        mem = {m["scope"]: m for m in r["pipeline_memberships"]
+               if m["pipeline"] == "pipeline:lib/Pipeline.cpp:buildSimplePipeline"}
         self.assertIn("module", mem)
         self.assertIn("func::FuncOp", mem)
         self.assertEqual(mem["module"]["condition"], "config.getEnableFancy()")
-        pats = r["patterns"]
+        pats = [p for p in r["patterns"] if "populator" not in p]
         self.assertEqual(len(pats), 1)
         self.assertEqual(pats[0]["matches_ops"], ["op:Simple_FoldOp"])
         self.assertEqual(pats[0]["creates_ops"], ["op:Simple_CanonicalOp"])
         self.assertTrue(r["tests"])
 
     def test_pipeline_order_and_conditions(self):
-        r = self.svc.get_pipeline("buildSimplePipeline")
+        r = self.svc.get_pipeline("pipeline:lib/Pipeline.cpp:buildSimplePipeline")
         self.assertNotIn("error", r)
-        conds = {s["pass"]: s["condition"] for s in r["stages"]}
-        self.assertIsNone(conds.get("pass:Inline"))
-        self.assertEqual(conds.get("pass:simple-fold"), "config.getEnableFancy()")
+        conds = {(s["pass"], s["scope"]): s["condition"] for s in r["stages"]}
+        self.assertIsNone(conds.get(("pass:Inline", "module")))
+        self.assertEqual(conds.get(("pass:simple-fold", "module")),
+                         "config.getEnableFancy()")
         self.assertTrue(r["sub_pipelines"])
+
+    def test_pipeline_brief_mode_is_compact(self):
+        full = self.svc.get_pipeline("pipeline:lib/Pipeline.cpp:buildSimplePipeline")
+        brief = self.svc.get_pipeline("pipeline:lib/Pipeline.cpp:buildSimplePipeline",
+                                      brief=True)
+        self.assertNotIn("evidence", brief["stages"][0])
+        self.assertIn("evidence", full["stages"][0])
+        self.assertEqual(len(full["stages"]), len(brief["stages"]))
 
     def test_incremental_unchanged(self):
         idx = Indexer(self.repo)
@@ -90,17 +100,37 @@ class FixtureTest(unittest.TestCase):
             r = self.svc.get_pass(name)
             self.assertEqual(r["pass"]["id"], "pass:simple-fold", name)
 
+    def test_pattern_provenance_chain(self):
+        r = self.svc.get_pass("simple-fold")
+        pops = [p for p in r["patterns"] if "populator" in p]
+        self.assertTrue(pops, "populator provenance missing")
+        pop = [p for p in pops if "populateSimpleFoldPatterns" in p["populator"]][0]
+        self.assertEqual({p["pattern"] for p in pop["patterns"]},
+                         {"pattern:SecondSimplePattern"})  # FoldSimplePattern is direct-use
+        own = self.svc.pattern_owner("SecondSimplePattern")
+        own = self.svc.pattern_owner("FoldSimplePattern")
+        self.assertTrue(any("populateSimpleFoldPatterns" in o["function"]
+                            for o in own["populators"]))
+        self.assertTrue(any("pass:simple-fold" in o["passes"] for o in own["populators"]))
+
+    def test_same_name_pipeline_builders_not_merged(self):
+        r = self.svc.get_pipeline("buildSimplePipeline")
+        self.assertEqual(r.get("error"), "ambiguous")
+        ids = r["candidates"]
+        self.assertEqual(len(ids), 2)
+        self.assertTrue(all(":" in i for i in ids))
+        one = self.svc.get_pipeline([i for i in ids if "Pipeline.cpp:" in i][0])
+        self.assertEqual(len([s for s in one["stages"] if s["scope"] == "module"]), 3)
+        self.assertTrue(all(s.get("seq") is not None for s in one["stages"]))
+        b = self.svc.pipeline_builder("buildSimplePipeline")
+        self.assertEqual(b.get("error"), "ambiguous")
+        pb = self.svc.pipeline_builder([i for i in ids if "Pipeline.cpp:" in i][0])
+        self.assertTrue(pb["builders"])
+
     def test_ambiguous_short_name_is_explicit(self):
         # short names matching several passes must not resolve silently
         r = self.svc.get_pass("FoldPass")
         self.assertEqual(r.get("error"), "not found")
-
-    def test_pipeline_brief_mode_is_compact(self):
-        full = self.svc.get_pipeline("buildSimplePipeline")
-        brief = self.svc.get_pipeline("buildSimplePipeline", brief=True)
-        self.assertNotIn("evidence", brief["stages"][0])
-        self.assertIn("evidence", full["stages"][0])
-        self.assertEqual(len(full["stages"]), len(brief["stages"]))
 
     def test_fail_soft_on_bad_file(self):
         tmp = tempfile.mkdtemp()

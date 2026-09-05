@@ -1,6 +1,12 @@
 # Knowledge Graph Schema (Phase 0 contract)
 
-Storage: SQLite (`.mlir-repomap/index.db`) + JSON metadata. Schema version field in
+Storage: SQLite (`.mlir-repomap/index.db`) + JSON metadata.
+
+Pipeline identity (ADR-012): node id is `pipeline:<file>:<name>` — same-name builders in
+different files never merge (AscendNPU-IR's dual `alignStoragePipeline` is the validated
+case). Queries by bare name return the unique match or an explicit ambiguity error with
+file-qualified candidates. `PIPELINE_CONTAINS` edges carry both `order` (per-scope) and
+`seq` (monotonic source order across scopes, QG-6). Schema version field in
 `meta` table; query API never exposes raw storage, so storage may change freely.
 
 ## Entities (`nodes` table)
@@ -16,7 +22,9 @@ Storage: SQLite (`.mlir-repomap/index.db`) + JSON metadata. Schema version field
 | `pipeline` | `pipeline:<buildXxxPipeline|runXxx>` | `void buildXxxPipeline(OpPassManager&...)`, `runXxxCompile` |
 | `pattern` | `pattern:<CppClass>` | `struct X : OpRewritePattern<FooOp>` etc. |
 | `interface` | `interface:<Name>` | `def X : Interface<...>` in .td |
-| `test` | `test:<repo-relative-path>` | files with `RUN:` lines |
+| `test` | `test:<repo-relative-path>` | files with `RUN:` lines; `summary` carries heuristic `features:` tags (dynamic-shape, reduction, fusion, vectorization, bufferization, stride-align, nested-region) |
+| `function` | `function:<file>:<name>` | C++ functions that take `RewritePatternSet&` (pattern-set helpers/populators) and pipeline builders |
+| `attribute` | `attribute:<Name>` | IR attribute names referenced as `<Name>Attr::name` |
 | `symbol` | `func:<name>` / `cppclass:<Name>` | free C++ functions/classes of interest |
 | `file` | `file:<relpath>` | git tracked files (lightweight; for provenance queries) |
 
@@ -40,12 +48,16 @@ Directed; `src`/`dst` are node ids. Edge kinds (MVP set):
 | `PRECEDES` | pass A before pass B in same pipeline scope | derived at extraction | confirmed |
 | `CONDITION` | edge attribute (not node): guard expression on PIPELINE_* edges | `if (...) { addPass }` | confirmed |
 | `PASS_USES_PATTERN` | pass/pipeline -> pattern | `patterns.add<X>(...)` within pass buildX or pass class | confirmed/inferred |
+| `PASS_USES_PATTERN_POPULATOR` | pass -> pattern-set function | call site of a `RewritePatternSet&`-taking function from a pass class/method | confirmed (ADR-012) |
+| `FUNCTION_DEFINES_PATTERN` | function -> pattern | `patterns.add<X>(...)` inside a pattern-set function | confirmed |
+| `FUNCTION_CALLS` | function -> function | pattern-set helper call chain (populate -> register -> add) | confirmed |
+| `PIPELINE_BUILT_BY` | pipeline -> builder function | pipeline builder definition | confirmed (ADR-012) |
+| `CREATES_ATTRIBUTE` | pass -> attribute | `<Name>Attr::name` referenced inside pass class body | inferred |
+| `REFERENCES` | generic symbol reference fallback | text search | heuristic |
 | `PATTERN_MATCHES_OP` | pattern -> op | template arg of OpRewritePattern/OpConversionPattern | confirmed |
 | `PATTERN_CREATES_OP` | pattern -> op | `rewriter.create<BarOp>` in pattern body | confirmed (local), inferred via helpers |
 | `TEST_COVERS_PASS` | test -> pass | pass arg / flag / pipeline name in RUN line | heuristic |
 | `TEST_EXERCISES_PIPELINE` | test -> pipeline | pipeline builder/tool flag in RUN line | heuristic |
-| `REFERENCES` | generic symbol reference fallback | text search | heuristic |
-
 Conditional pipelines: `if (config.getX()) { pm.addPass(A); pm.addPass(B); }` produces
 PIPELINE_CONTAINS edges with a `condition` property = the guard expression (outermost `if`
 text captured with brace tracking). `#if/#ifdef` macro guards are recorded as

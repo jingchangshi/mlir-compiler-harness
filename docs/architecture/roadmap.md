@@ -1,19 +1,21 @@
 # Roadmap
 
 done: Phase 0 (contract) · Phase 1 (MVP engine) · Phase 2 (validation) · Phase 3
-(workflows; ADR-009) · Phase 4 (agent adapters; ADR-010) · Phase 5 (ZCode-driven deep
-analysis validation; ADR-011, docs/validation/phase5/).
+(workflows; ADR-009) · Phase 4 (agent adapters; ADR-010) · Phase 5 (deep validation;
+ADR-011) · Phase 6 (provenance-aware graph; ADR-012, docs/validation/phase6/).
 
 current: none.
 
-next (ranked by Phase 5 observed friction — ADR-011):
-1. **C. Pattern & pipeline identity extraction enhancement** (was Phase 3.5, promoted):
-   chase free-function `populate*Patterns` registration (QG-3, affected 6/6 analyses) and
-   qualify same-name pipeline builders (QG-1, produced a wrong-by-merge stage list on the
-   first real audit).
-2. **D. Schema enhancement**: attribute entities + REFERENCES edges (QG-4), test feature
-   tags & pipeline links (QG-5), cross-scope `seq` ordering (QG-6).
-3. **E. Workflow refinements**: fold WG-1..5 into docs/workflows (cheap doc changes).
+next (based on Phase 6 evidence):
+1. **Workflow refinements** (fold WG-1..5 + provenance-query guidance into docs/workflows):
+   the graph now answers questions the workflows don't yet instruct agents to ask
+   (`pattern-owner`, `attribute`).
+2. **Multi-repo adapter hardening**: run DeepSeek/ZCode adapters on a second MLIR repo to
+   prove the provenance graph is not AscendNPU-IR-shaped.
+
+deferred (unchanged, evidence-based): MCP — no hot-path pressure through Phase 6; clangd —
+no wrong-fact incident through Phase 6; the remaining name-level attribute semantics and
+non-RewritePatternSet indirection do not yet justify a full semantic backend.
 
 deferred (evidence-based):
 - **A. MCP adapter** — no CLI-inconvenience pressure in Phases 4–5.

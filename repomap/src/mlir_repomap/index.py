@@ -141,12 +141,23 @@ class Indexer:
         class_to_pass = {}
         for dst, props in db.execute("SELECT dst, props FROM edges WHERE kind='DEFINES'"):
             p = json.loads(props)
-            for key in ("tblgen_class", "cpp_class"):
-                if p.get(key):
-                    class_to_pass[p[key]] = dst
-            # MLIR idiom: impl::<TdClass>Base<> generated pass base
             if p.get("tblgen_class"):
+                class_to_pass[p["tblgen_class"]] = dst
                 class_to_pass[p["tblgen_class"] + "Base"] = dst
+        for src, dst, props in db.execute(
+                "SELECT src, dst, props FROM edges WHERE kind='PASS_IMPLEMENTS'"):
+            class_to_pass[dst.split(":", 1)[-1]] = src
+        # candidates for ambiguous class names: every pass id the class can mean
+        class_candidates = {}
+        for dst, props in db.execute("SELECT dst, props FROM edges WHERE kind='DEFINES'"):
+            p = json.loads(props)
+            for key in ("tblgen_class", "cpp_class"):
+                if p.get(key) and dst.startswith("pass:"):
+                    class_candidates.setdefault(p[key], []).append(dst)
+            if p.get("cpp_class") and p.get("impl_base") and dst.startswith("pass_class:"):
+                cand = class_to_pass.get(p["impl_base"])
+                if cand:
+                    class_candidates.setdefault(p["cpp_class"], []).append(cand)
         # bridge: impl::<TdClass>Base<Concrete> -> concrete cpp class maps to the pass
         for dst, props in db.execute("SELECT dst, props FROM edges WHERE kind='DEFINES'"):
             p = json.loads(props)
@@ -258,15 +269,57 @@ class Indexer:
                             "FROM edges WHERE src=? AND dst=? AND kind='DIALECT_OWNS'",
                             (file, 1, 1, "", "inferred", owner, nid))
 
-        # rewrite pass_class:* sources to the owning pass (pattern + populator edges)
+        # rewrite pass_class:* sources to the owning pass (pattern + populator edges);
+        # class names can collide across dialects (two FlattenOpsPass) -> locality pick
+        def _pick_pass(cls, eid):
+            cands = class_candidates.get(cls) or (
+                [class_to_pass[cls]] if cls in class_to_pass else [])
+            if len(cands) <= 1:
+                return cands[0] if cands else None, None
+            evrow = db.execute("SELECT file FROM evidence WHERE edge_id=? LIMIT 1",
+                               (eid,)).fetchone()
+            if evrow:
+                parts = set(evrow[0].split("/"))
+                for c in cands:
+                    pn = (db.execute("SELECT file FROM nodes WHERE id=?",
+                                     (c,)).fetchone() or [""])[0]
+                    if pn and (set(pn.split("/")) & parts) - {
+                            "bishengir", "lib", "include", "Transforms",
+                            "Pipelines", "Dialect", "Passes.td"}:
+                        return c, "same-dialect-heuristic"
+            return cands[0], "ambiguous-class-name"
+
         for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR"):
             for eid, src in db.execute(
                     f"SELECT edge_id, src FROM edges WHERE kind='{kind}' "
                     "AND src LIKE 'pass_class:%'").fetchall():
                 cls = src.split(":", 1)[-1]
-                if cls in class_to_pass:
+                tgt, disamb = _pick_pass(cls, eid)
+                if tgt:
                     db.execute("UPDATE edges SET src=? WHERE edge_id=?",
-                               (class_to_pass[cls], eid))
+                               (tgt, eid))
+                    if disamb:
+                        db.execute("UPDATE edges SET props=json_set(props,"
+                                   "'$.disambiguation',?) WHERE edge_id=?",
+                                   (disamb, eid))
+        # resolve cross-file populator call markers to function ids (QG-3)
+        func_names = {}
+        for fid, nm in db.execute("SELECT id, name FROM nodes WHERE kind='function'"):
+            func_names.setdefault(nm, []).append(fid)
+        for eid, dst in db.execute(
+                "SELECT edge_id, dst FROM edges WHERE dst LIKE 'function:NAME:%' "
+                "AND kind IN ('PASS_USES_PATTERN_POPULATOR','FUNCTION_CALLS')").fetchall():
+            nm = dst.split("function:NAME:", 1)[-1]
+            ids = func_names.get(nm, [])
+            if len(ids) == 1:
+                db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (ids[0], eid))
+            elif not ids:
+                db.execute("DELETE FROM evidence WHERE edge_id=?", (eid,))
+                db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+            else:
+                db.execute("UPDATE edges SET props=json_set(props,'$.ambiguous_name',?) "
+                           "WHERE edge_id=?", (nm, eid))
+
         # resolve name-based pipeline call markers to file-qualified pipeline ids (QG-1)
         pipe_names = {}
         for pid, nm in db.execute("SELECT id, name FROM nodes WHERE kind='pipeline'"):

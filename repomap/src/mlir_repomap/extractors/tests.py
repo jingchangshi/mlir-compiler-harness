@@ -27,8 +27,8 @@ def extract(relpath, text):
         if any(n in hay for n in needles):
             feats.add(tag)
     node = {"id": nid, "kind": model.TEST, "name": relpath.rsplit("/", 1)[-1],
-            "summary": "", "file": relpath, "line": 1,
-            "features": sorted(feats)}
+            "summary": "features: " + ",".join(sorted(feats)) if feats else "",
+            "file": relpath, "line": 1}
     edges = []
     all_runs = "\n".join(runs)
     # pass-ish flags: -foo-bar or --foo-bar in RUN lines

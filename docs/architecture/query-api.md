@@ -29,6 +29,9 @@ to re-index; workflows must refresh before reasoning if stale).
 | `tests <pass-or-pipeline>` | get_tests(name) | covering tests w/ RUN lines + confidence |
 | `changed [base]` | get_changes(base=None) | files changed vs index (and vs base ref if given) + impacted entities |
 | `evidence <node-or-edge-id>` | get_evidence(id) | all evidence rows with file:line + snippet |
+| `pattern-owner <pattern>` | pattern_owner(name) | provenance chain: pattern -> defining pattern-set function(s) -> pass(es), with evidence |
+| `pipeline-builder <pipeline>` | pipeline_builder(name) | file-qualified builder function(s), sub-pipeline calls, callers |
+| `attribute <name>` | get_attribute(name) | attribute provenance: referencing files (heuristic) + confirmed creating pass classes |
 
 Token discipline: every command returns compact JSON with `file:line` pointers, never file
 contents; the agent opens only what it needs. `pass <name>` is the one-stop dossier for the

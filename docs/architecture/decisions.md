@@ -131,3 +131,30 @@ MCP (A) and clangd (B) remain deferred — no hot-path pressure and no wrong-fac
 were observed.
 Consequences: the engine stays frozen at Phase 4 while its gap log carries the next
 phase's backlog; workflow gaps (WG-1..5) are cheap doc changes to fold into the next phase.
+
+## ADR-012 (2026-09-05, accepted) — Provenance-aware graph: pipeline identity + pattern population chain
+
+Context: Phase 5 proved the main limitation was missing deterministic provenance (QG-1,
+QG-3 among others). 
+Decision:
+1. Pipeline identity is `pipeline:<file>:<name>` (namespace+file+function), never the bare
+   name; bare-name queries resolve uniquely or return explicit ambiguity. Builders are
+   first-class `function` nodes (PIPELINE_BUILT_BY). Validated on AscendNPU-IR's dual
+   `alignStoragePipeline`.
+2. Pattern-population functions are identified by their signature (a `RewritePatternSet&`
+   parameter), not by naming convention; the `populate*` prefix is used only for cross-file
+   call-site markers. Chain: PASS_USES_PATTERN_POPULATOR -> FUNCTION_CALLS* ->
+   FUNCTION_DEFINES_PATTERN, all with file:line evidence and confirmed/inferred confidence.
+3. Attribute provenance: `attribute:<Name>` nodes from `<Name>Attr::name` references;
+   pass-body references become CREATES_ATTRIBUTE (inferred); file references stay
+   REFERENCES (heuristic).
+4. Class-name collisions across dialects (two `FlattenOpsPass`) are resolved at edge-rewrite
+   time by the same-dialect locality heuristic (extension of ADR-007), flagged in props.
+5. `seq` (monotonic source order) added next to per-scope `order` (QG-6); test feature tags
+   added as heuristic node summaries (QG-5).
+Evidence: docs/validation/phase6/README.md — FlattenOps ownership heuristic→confirmed,
+alignStoragePipeline merge eliminated, StrideAlignDimsAttr chain a single query.
+Consequences: query API gains `pattern-owner`, `pipeline-builder`, `attribute` (all with
+workflow consumers from Phase 5 dossiers); INDEXER_VERSION bumps force one full re-index.
+Remaining: value-level attribute semantics and non-RewritePatternSet builder indirection
+stay unmodeled (documented, low impact).

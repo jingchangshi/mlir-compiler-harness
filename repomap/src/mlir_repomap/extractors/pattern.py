@@ -10,17 +10,19 @@ RE_PATTERN_CLASS = re.compile(
 RE_PATTERNS_ADD = re.compile(r'patterns\.add\s*<\s*([\w:\s,<>&]+?)\s*>\s*\(')
 # MLIR convention: a pattern-population function takes RewritePatternSet& (name-agnostic;
 # `populate*` prefix recorded as a property, not used for identification)
+# MLIR convention: pattern-population functions take a RewritePatternSet& -- identified
+# by that signature, NOT by name (populate* prefix is recorded, never required)
 RE_POPULATOR_DEF = re.compile(
-    r'\b(?:static\s+)?(?:[\w:<>,\s*&*]+?)\s+(?:[\w:]+::)?'
-    r'(populate\w*|\w*[Pp]attern\w*)\s*\('
+    r'\b(?:static\s+)?(?:[\w:<>,\s*&*]+?)\s+(?:[\w:]+::)?(\w+)\s*\('
     r'([^;{]*RewritePatternSet\s*&[^;{]*)\)\s*(?:const\s*)?\{')
-RE_POPULATOR_CALL = re.compile(r'\b(populate\w*|\w*[Pp]attern\w*)\s*\(')
+# cross-file call markers: the populate* naming convention only
+RE_POPULATOR_CALL = re.compile(r'\b(populate\w*)\s*\(')
 RE_CREATE_OP = re.compile(r'(?:rewriter|builder|b)\.create\s*<\s*([\w:]+)\s*>')
 RE_CONV_ADD = re.compile(r'addConversion\(')
 
 
 RE_OUTOFLINE_METHOD = re.compile(
-    r'\b([A-Za-z]\w*)::(runOnOperation|initialize|run)\s*\([^;{]*\)\s*(?:const\s*)?\{')
+    r'\b([A-Za-z]\w*)::([A-Za-z]\w*)\s*\([^;{]*\)\s*(?:const\s*)?\{')
 
 
 def _method_bodies(text):
@@ -80,13 +82,14 @@ def extract(relpath, text):
     name_to_span = {n: (s, e) for n, m, s, e in _class_bodies(text)}
     # pattern-population functions (QG-3): identified by RewritePatternSet& param
     populator_spans = _function_bodies(text, RE_POPULATOR_DEF)
-    populator_defs = {}  # name -> (fid, file, line, is_populate_prefix)
+    populator_defs = {}  # name -> fid (any function taking RewritePatternSet&)
     for n, s, e in populator_spans:
         fid = f"function:{relpath}:{n}"
-        populator_defs[n] = (fid, s)
+        populator_defs[n] = fid
         nodes.append({"id": fid, "kind": model.FUNCTION, "name": n,
-                      "summary": "pattern population function", "file": relpath,
-                      "line": text[:s].count("\n") + 1})
+                      "summary": "pattern population function"
+                      if n.startswith("populate") else "pattern-set helper",
+                      "file": relpath, "line": text[:s].count("\n") + 1})
     # container bodies include populators themselves so patterns.add inside them links here
     bodies += [(n, None, s, e) for n, s, e in populator_spans]
 
@@ -136,30 +139,33 @@ def extract(relpath, text):
                 else:
                     src = f"pass_class:{container}"
             if src is None and container in populator_defs:
-                # patterns.add inside a populator function (QG-3 provenance chain)
-                src, kind = populator_defs[container][0], model.FUNCTION_DEFINES_PATTERN
+                # patterns.add inside a pattern-set function (QG-3 provenance chain)
+                src, kind = populator_defs[container], model.FUNCTION_DEFINES_PATTERN
             if src is None:
                 continue
             edges.append({"src": src, "dst": f"pattern:{n}", "kind": kind,
                           "props": {"template_arg": "<" in m.group(1)},
                           "evidence": ev(off, m.end())})
 
-    # call sites: container (pass class / method / pipeline builder / other function)
-    # calls a populator -> PASS_USES_PATTERN_POPULATOR / FUNCTION_CALLS
-    for m in RE_POPULATOR_CALL.finditer(text):
-        callee = m.group(1)
-        if callee not in populator_defs:
+    # call sites: container (pass class / method / other function) calls a pattern-set
+    # function -> PASS_USES_PATTERN_POPULATOR / FUNCTION_CALLS
+    call_spans = [(m.group(1), m.start(), m.end())
+                  for m in re.finditer(r'\b([A-Za-z]\w*)(?:<[^<>()]*>)?\s*\(', text)]
+    for callee, off, off_end in call_spans:
+        own = populator_defs.get(callee)
+        marker = callee.startswith("populate") and own is None
+        if own is None and not marker:
             continue
-        off = m.start()
-        if populator_defs[callee][1] <= off <= [e for n, s, e in populator_spans if n == callee][0]:
-            continue  # its own definition
         container = None
         for n, mm, s, e in bodies:
             if s <= off <= e:
                 container = n
         if container is None or container == callee:
             continue
-        fid = populator_defs[callee][0]
+        if own and container == callee:
+            continue  # reference inside its own body
+        # cross-file calls use a name marker resolved at graph-resolution time
+        fid = own if own else f"function:NAME:{callee}"
         if container in name_to_span:
             src = (f"pattern:{container}" if any(p["id"].split(":")[-1] == container
                     for p in nodes if p["id"].startswith("pattern:"))
@@ -170,6 +176,6 @@ def extract(relpath, text):
             src = f"function:{relpath}:{container}"
             kind = model.FUNCTION_CALLS
         edges.append({"src": src, "dst": fid, "kind": kind, "props": {},
-                      "evidence": ev(off, m.end())})
+                      "evidence": ev(off, off_end)})
 
     return {"nodes": nodes, "edges": edges, "diagnostics": []}

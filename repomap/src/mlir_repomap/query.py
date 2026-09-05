@@ -176,18 +176,28 @@ class QueryService:
                         pat, model.PATTERN_CREATES_OP)]})
             patterns.append({"populator": fid, "node": fn, "confidence": e["confidence"],
                              "evidence": e["evidence"], "patterns": pat_detail})
-            # nested populator calls (populateFusionPatterns -> populateMatmulPatterns)
-            for ce in self.store.edges_from(fid, model.FUNCTION_CALLS):
-                sub = self._node_or_none(ce["dst"]) or {"id": ce["dst"]}
-                sub_pats = [x["dst"] for x in self.store.edges_from(
-                    ce["dst"], model.FUNCTION_DEFINES_PATTERN)]
-                seen_patterns.update(sub_pats)
-                patterns.append({"populator": ce["dst"], "node": sub, "confidence": "inferred",
-                                 "evidence": ce["evidence"],
-                                 "patterns": [{"pattern": pt,
-                                               "matches_ops": [x["dst"] for x in
-                                                               self.store.edges_from(pt, model.PATTERN_MATCHES_OP)],
-                                               "creates_ops": []} for pt in sub_pats]})
+            # nested pattern-set helpers, recursively (populate -> helper -> pattern)
+            def walk_functions(f, depth, seen):
+                if depth > 4 or f in seen:
+                    return
+                seen.add(f)
+                for ce in self.store.edges_from(f, model.FUNCTION_CALLS):
+                    sub_id = ce["dst"]
+                    sub = self._node_or_none(sub_id) or {"id": sub_id}
+                    sub_pats = [x["dst"] for x in self.store.edges_from(
+                        sub_id, model.FUNCTION_DEFINES_PATTERN)
+                        if x["dst"] not in seen_patterns]
+                    seen_patterns.update(sub_pats)
+                    if sub_pats:
+                        patterns.append({"populator": sub_id, "node": sub,
+                                         "confidence": "inferred",
+                                         "evidence": ce["evidence"],
+                                         "patterns": [{"pattern": pt,
+                                                       "matches_ops": [x["dst"] for x in
+                                                                       self.store.edges_from(pt, model.PATTERN_MATCHES_OP)],
+                                                       "creates_ops": []} for pt in sub_pats]})
+                    walk_functions(sub_id, depth + 1, seen)
+            walk_functions(fid, 0, set())
         factories = [e["dst"] for e in self.store.edges_from(nid, model.PASS_HAS_FACTORY)]
         impl = [e["dst"] for e in self.store.edges_from(nid, model.PASS_IMPLEMENTS)]
         tests = self.get_tests(node["name"]).get("tests", [])
@@ -277,8 +287,12 @@ class QueryService:
         for e in self._evidence_summary(
                 self.store.edges_to(nid, model.TEST_COVERS_PASS)
                 + self.store.edges_to(nid, model.TEST_EXERCISES_PIPELINE)):
+            node = self._node_or_none(e["src"]) or {}
             tests.append({"test": e["src"], "kind": e["kind"],
-                          "confidence": e["confidence"], "evidence": e["evidence"]})
+                          "confidence": e["confidence"], "evidence": e["evidence"],
+                          "features": (node.get("summary") or "")
+                          .replace("features: ", "").split(",")
+                          if (node.get("summary") or "").startswith("features: ") else []})
         return {"tests": tests}
 
     def get_changes(self, base=None):

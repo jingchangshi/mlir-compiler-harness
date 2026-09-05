@@ -83,3 +83,39 @@ void SimpleFoldPass::runOnOperation() {
   populateSimpleFoldPatterns(patterns);
   applyPatternsGreedily(getOperation(), std::move(patterns));
 }
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
