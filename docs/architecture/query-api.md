@@ -21,9 +21,9 @@ to re-index; workflows must refresh before reasoning if stale).
 | `modules [--depth N]` | modules(depth=2) | directory modules (top N path levels, default 2) with entity counts |
 | `dialects` | dialects(name=None) | dialect list w/ ops/types/attrs counts, def file |
 | `passes` | passes(query=None) | pass list: arg, kind (td/cpp), def file, summary |
-| `pass <name>` | get_pass(name) | full dossier (below) |
+| `pass <name>` | get_pass(name) | full dossier (below). `<name>` may be the pass arg, td class, cpp class, or factory name; case-insensitive. Multiple candidates return `{"error":"ambiguous","candidates":[...]}` — callers must ask, never guess |
 | `pipelines` | pipelines() | pipeline list w/ entry file, pass count |
-| `pipeline <name>` | get_pipeline(name) | ordered stages incl. conditions, nested scopes, called sub-pipelines |
+| `pipeline <name> [--brief]` | get_pipeline(name, brief) | ordered stages incl. conditions, nested scopes, called sub-pipelines. `--brief` omits per-stage evidence rows (stage-level evidence remains available via the `evidence` command) |
 | `symbol <name>` | find_symbol(name) | matching entities (class/function/op/pattern) + def evidence |
 | `references <name>` | get_references(name) | edges/mentions of the entity grouped by kind |
 | `tests <pass-or-pipeline>` | get_tests(name) | covering tests w/ RUN lines + confidence |

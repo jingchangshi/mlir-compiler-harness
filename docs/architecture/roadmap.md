@@ -1,23 +1,28 @@
 # Roadmap
 
 done: Phase 0 (contract) · Phase 1 (MVP engine) · Phase 2 (AscendNPU-IR validation) ·
-Phase 3 (agent-independent workflows + real-repo execution; engine refinements per ADR-009).
+Phase 3 (workflows + real-repo execution; ADR-009) · Phase 4 (agent adapters, validated;
+ADR-010, validation-adapters.md).
 
 current: none.
 
-next (recommended, based on Phase 3 evidence — re-evaluate after each):
-1. **Phase 4 — agent adapters** (recommended next). Rationale: the workflows and query
-   contract have now been proven end-to-end by an agent following them; the marginal value
-   is in letting other agents (ZCode skills, DeepSeek Harness prompts) reproduce that
-   behavior with near-zero methodology drift. Both adapters are thin wrappers —
-   `adapters/zcode/` (3 skills referencing docs/workflows/) and `adapters/deepseek-harness/`
-   (goal/system prompt templates + CLI conventions).
-2. **Phase 3.5 (background, small) — `populateXxxPatterns` chasing**: a single helper-level
-   extractor (find `populate\w+Patterns(RewritePatternSet&)` definitions and their call
-   sites within pass classes) would lift pattern-link coverage from 79/332 toward the
-   long tail. Defer until a real analysis is blocked by it — Phase 3 showed the workflows
-   tolerate the gap.
-3. Phase 5 — MCP adapter (only after adapters show which commands are hot).
+next (recommended, based on Phase 4 evidence — re-evaluate after each):
+1. **Adapter usage hardening** (recommended next): run the DeepSeek Harness templates and
+   ZCode skills on real tasks across ≥2 different models and ≥2 more MLIR repos; collect
+   the run reports' "missing/insufficient query" lines as the evidence channel that should
+   drive the next engine/contract investment.
+2. **Phase 3.5 (background, small) — `populateXxxPatterns` chasing**: unchanged from
+   Phase 3 assessment; still no validation run was blocked by it.
+3. **MCP adapter**: still deferred. Phase 4 runs surfaced no CLI-inconvenience pressure;
+   decide after the usage-hardening loop.
+
+deferred:
+- clangd/LSP semantic backend — no wrong-fact incident in Phase 3/4 validations;
+  the flagged locality heuristic held. Revisit only if a dossier contradicts the graph.
+- Ranking/PageRank, embeddings, Web UI.
+
+rejected: indexing generated build-tree C++ (ADR-001); per-config pipeline variant nodes (ADR-002);
+methodology duplication inside adapters (ADR-010).
 
 deferred:
 - clangd/LSP semantic backend — ADR-007 factory-namespace disambiguation is the only

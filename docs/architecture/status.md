@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–3 complete)
+Updated: 2026-09-05 (Phases 0–4 complete)
 
 ## Implemented
 
@@ -25,6 +25,15 @@ fillable from queries + evidence-pointed files; repository-wide grep was not nee
 Two query/extractor gaps surfaced and were fixed (modules depth, pattern idioms); one
 remains (`populate*` chasing) and did not block the workflows.
 
+
+- Phase 4 agent adapters (`adapters/deepseek-harness/` goal templates + conventions,
+  `adapters/zcode/` three thin skills) validated on AscendNPU-IR
+  (`validation-adapters.md`): 9/9 fact consistency for a simulated capability-limited
+  DeepSeek-style run vs the Phase 3 dossier; ZCode skills verified for frontmatter,
+  harness resolution, no-rescan, and consistent output. Adapter contract recorded in
+  ADR-010. Validation drove two contract fixes: multi-strategy pass-name resolution with
+  explicit ambiguity, and `pipeline --brief`.
+
 ## Current limitations
 
 - `populateXxxPatterns()` free-function chasing still missing (139/79 coverage, not 332/332).
@@ -33,9 +42,10 @@ remains (`populate*` chasing) and did not block the workflows.
 - Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).
 - Test links are name/flag heuristics; `tests <pipeline>` often empty because RUN lines
   reference tool flags, not builder names.
+- Short pass names may be inherently ambiguous across dialects (engine returns explicit
+  ambiguity; agents must ask).
 - No MCP, no agent skills, no clangd (deliberately deferred).
 
 ## Next recommended phase
 
-Phase 4 (agent adapters: ZCode skills + DeepSeek Harness templates) — see roadmap.md;
-pattern chasing stays open as Phase 3.5 background work.
+See roadmap.md (adapter usage hardening / MCP decision deferred until hot-path evidence).

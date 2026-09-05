@@ -96,3 +96,23 @@ repo-specific heuristics (rejected by architecture principles).
 Consequences: INDEXER_VERSION bumps (9); partial Phase 3.5 value delivered early.
 Remaining known gap: `populateXxxPatterns()` free-function chasing still missing; clangd
 still deferred (ADR-003) — re-evaluate after adapter phases.
+
+## ADR-010 (2026-09-05, accepted) — Adapter contract: thin wrappers + explicit harness resolution
+
+Context: Phase 4 built the first two adapters (DeepSeek Harness goal templates, ZCode
+skills) and validated them on AscendNPU-IR.
+Decision:
+1. Adapters contain only trigger description, workflow entry, fixed query strategy, and
+   output convention. Methodology is read at run time from `docs/workflows/` (source of
+   truth); copying workflow text into an adapter is a violation.
+2. Harness resolution order: `$MLIR_COMPILER_HARNESS` → `<target-repo>/../mlir-compiler-harness`
+   → abort with a clear message. An agent must never substitute remembered methodology.
+3. Goal templates open with an explicit guardrail block (read workflow first, RepoMap
+   before source, no repo-wide grep, no name-guessing, evidence on every claim) because
+   target models may vary in capability.
+4. Ambiguous user input resolves to an explicit ambiguity error from the engine — the
+   adapter instructs the agent to ask, never to pick silently (validated with "FlattenOps").
+Evidence: validation-adapters.md — 9/9 fact consistency between an independent simulated
+DeepSeek-style run and the Phase 3 dossier; ZCode skills trigger-resolve correctly.
+Consequences: adapters stay small and safe to regenerate; engine/contract fixes during
+validation (pass-name resolution, `pipeline --brief`) needed no adapter rewording.

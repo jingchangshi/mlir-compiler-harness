@@ -84,6 +84,24 @@ class FixtureTest(unittest.TestCase):
         svc.close()
         self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
 
+    def test_pass_resolution_by_class_and_factory_name(self):
+        # user-facing names: td class / cpp class / factory, not only the pass arg
+        for name in ("SimpleFoldPass", "createSimpleFoldPass"):
+            r = self.svc.get_pass(name)
+            self.assertEqual(r["pass"]["id"], "pass:simple-fold", name)
+
+    def test_ambiguous_short_name_is_explicit(self):
+        # short names matching several passes must not resolve silently
+        r = self.svc.get_pass("FoldPass")
+        self.assertEqual(r.get("error"), "not found")
+
+    def test_pipeline_brief_mode_is_compact(self):
+        full = self.svc.get_pipeline("buildSimplePipeline")
+        brief = self.svc.get_pipeline("buildSimplePipeline", brief=True)
+        self.assertNotIn("evidence", brief["stages"][0])
+        self.assertIn("evidence", full["stages"][0])
+        self.assertEqual(len(full["stages"]), len(brief["stages"]))
+
     def test_fail_soft_on_bad_file(self):
         tmp = tempfile.mkdtemp()
         try:

@@ -81,18 +81,56 @@ class QueryService:
         return {"passes": [{k: p[k] for k in ("id", "name", "summary", "file", "line")}
                            for p in ps]}
 
-    def get_pass(self, name):
+    def _resolve_pass(self, name):
+        """Resolve a pass by arg, td class, cpp class, or factory name.
+
+        Multiple strategies vote; a unique candidate resolves, several candidates
+        return an explicit ambiguity error (never a silent pick).
+        """
         nid = name if name.startswith("pass:") else f"pass:{name}"
         node = self._node_or_none(nid)
-        if not node:
-            # fuzzy: unique substring match
-            cands = [n for n in self.store.search_nodes(name) if n["kind"] == model.PASS]
-            if len(cands) == 1:
-                nid, node = cands[0]["id"], cands[0]
-            elif cands:
-                return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
-            else:
-                return {"error": "not found"}
+        if node:
+            return nid, node
+        cands = set()
+        rows = self.store.db.execute(
+            "SELECT id FROM nodes WHERE kind='pass' AND LOWER(name)=LOWER(?)",
+            (name,)).fetchall()
+        cands |= {r[0] for r in rows}
+        for cls in (name, name + "Pass"):
+            rows = self.store.db.execute(
+                "SELECT props FROM edges WHERE kind='DEFINES'").fetchall()
+            for (p,) in rows:
+                props = json.loads(p)
+                if cls in (props.get("tblgen_class"), props.get("cpp_class")):
+                    rows2 = self.store.db.execute(
+                        "SELECT dst FROM edges WHERE kind='DEFINES' AND props=?",
+                        (p,)).fetchall()
+                    for (d,) in rows2:
+                        if d.startswith("pass:"):
+                            cands.add(d)
+        fac = name if name.startswith("create") else f"create{name}Pass"
+        rows = self.store.db.execute(
+            "SELECT src FROM edges WHERE kind='PASS_HAS_FACTORY' AND dst=?",
+            (f"factory:{fac}",)).fetchall()
+        cands |= {r[0] for r in rows}
+        if len(cands) == 1:
+            nid = next(iter(cands))
+            return nid, self._node_or_none(nid)
+        if len(cands) > 1:
+            return None, {"error": "ambiguous", "candidates": sorted(cands)}
+        cands = {n["id"] for n in self.store.search_nodes(name)
+                 if n["kind"] == model.PASS}
+        if len(cands) == 1:
+            nid = next(iter(cands))
+            return nid, self._node_or_none(nid)
+        if cands:
+            return None, {"error": "ambiguous", "candidates": sorted(cands)}
+        return None, {"error": "not found"}
+
+    def get_pass(self, name):
+        nid, node = self._resolve_pass(name)
+        if node is None or "error" in node:
+            return node if isinstance(node, dict) else {"error": "not found"}
         memberships = []
         for e in self._evidence_summary(self.store.edges_to(nid, model.PIPELINE_CONTAINS)):
             memberships.append({"pipeline": e["src"], "scope": e["props"].get("scope"),
@@ -137,7 +175,7 @@ class QueryService:
         out.sort(key=lambda x: -x["stages"])
         return {"pipelines": out}
 
-    def get_pipeline(self, name):
+    def get_pipeline(self, name, brief=False):
         nid = name if name.startswith("pipeline:") else f"pipeline:{name}"
         node = self._node_or_none(nid)
         if not node:
@@ -150,11 +188,14 @@ class QueryService:
                 return {"error": "not found"}
         stages = []
         for e in self._evidence_summary(self.store.edges_from(nid, model.PIPELINE_CONTAINS)):
-            stages.append({"pass": e["dst"], "order": e["props"].get("order"),
-                           "scope": e["props"].get("scope"),
-                           "nested": e["props"].get("nested", False),
-                           "condition": e["props"].get("condition"),
-                           "confidence": e["confidence"], "evidence": e["evidence"]})
+            stage = {"pass": e["dst"], "order": e["props"].get("order"),
+                     "scope": e["props"].get("scope"),
+                     "nested": e["props"].get("nested", False),
+                     "condition": e["props"].get("condition"),
+                     "confidence": e["confidence"]}
+            if not brief:
+                stage["evidence"] = e["evidence"]
+            stages.append(stage)
         stages.sort(key=lambda s: (s["scope"] or "", s["order"] or 0))
         subs = [e["dst"] for e in self.store.edges_from(nid, model.PIPELINE_CALLS)]
         callers = [e["src"] for e in self.store.edges_to(nid, model.PIPELINE_CALLS)]
