@@ -39,6 +39,14 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1x. **Cross-pass optimization flow** — across the whole pipeline, build the
+   opportunity ledger: which stage **creates** an optimization opportunity (e.g.
+   normalization/fusion enabling vectorization), which stage **blocks** one (a guard
+   whose condition excludes a legal-in-principle case — cite the HAS_CONSTRAINT
+   evidence), and where a **tradeoff** is introduced (a stage option or ordering choice
+   that buys one optimization at another's expense). The ledger is agent reasoning over
+   deterministic facts; every entry cites its constraint/transition evidence.
+
 1y. **Optimization flow lens** — using `pass-intent` / `pass-constraints` across the
    pipeline's stages, report which optimization opportunities are **created** (a stage
    enables a later one) and which are **lost** (a guard blocks a fusion/layout/scheduling

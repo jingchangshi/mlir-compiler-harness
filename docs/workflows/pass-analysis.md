@@ -73,6 +73,16 @@ query would have answered it (feeds the query-API review).
     exist?" — your reasoning, explicitly labeled as such). Never write an
     interpretation into the graph or present a heuristic label as confirmed.
 
+7f. **Compiler review record** — conclude the dossier with a review section answering,
+    in this order: (1) *why does this pass exist?* (intent, layered per 7d);
+    (2) *what invariant does it protect?* (each invariant tied to the constraint that
+    enforces it — from 7e — or marked "unguarded"); (3) *what optimization opportunity
+    may be lost?* (Current behavior / Evidence / Protected invariant / Lost opportunity /
+    Possible direction); (4) *what extension direction exists?* The review is an
+    agent-layer artifact: every judgment cites graph facts + evidence, and interpretations
+    are labeled as reasoning. Unguarded invariants (a contract with no enforcing
+    constraint) are the highest-value review findings — report them as such.
+
 7e. **Constraint analysis** — run `mlir-repomap pass-constraints <pass>`; each
     legality-guard / match-failure / early-return / pass-failure record is a
     deterministic fact (condition text + evidence line). Use them to answer *"what

@@ -106,3 +106,19 @@ whose entire meaning is the attribute contract.
 
 - query facts: intent_label={'label': 'lowering/conversion boundary', 'confidence': 'inferred'}; constraints={'legality-guard': 1}
   - `legality-guard`: failed(applyPartialConversion(module, target, std::move(patterns (third_party/ascend/lib/TritonToAnnotation/TritonToAnnotation.cpp:69)
+
+# Compiler Review (Phase 13 — review record, agent layer)
+
+- **Why does this pass exist?** To translate Triton-originated annotations into the
+  baseline repo's attribute-contract machinery (`annotation.mark`) — the smallest
+  cross-repo handoff with the largest semantic leverage.
+- **Protected invariants & enforcing constraints:** attribute payload forwarded
+  verbatim (code-guaranteed); partial conversion fails the pass (1 legality-guard).
+  **UNGUARDED**: forwarded attribute names are not validated against the consumer
+  repo's contract inventory (Phase 11 attribute map is the check, run by agents only).
+- **Optimization opportunity (record):**
+  Current behavior: unknown attribute names pass through silently. Evidence: 76-line
+  pass, no name validation. Protected invariant: forward-compatibility. Lost
+  opportunity: early detection of contract drift between repos. Possible direction:
+  ecosystem contract validation (compare against AscendNPU-IR attribute-map).
+- **Extension direction:** QG-7 external-dialect declarations + contract validation.

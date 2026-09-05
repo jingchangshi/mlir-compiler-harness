@@ -305,3 +305,22 @@ five dossiers upgraded with separated fact/interpretation sections.
 Consequences: the graph cannot "lie" about design intent; reasoning provenance is
 visible by which layer a claim comes from. Multi-line condition truncation and
 helper-scoped guards are recorded limitations.
+
+## ADR-019 (2026-09-05, accepted) — Review intelligence: three-layer separation, doc-layer review records
+
+Context: with the constraint substrate (ADR-018) in place, review workflows can produce
+design-level findings; the risk is polluting facts with judgment.
+Decision: (1) review records are **doc-layer artifacts** in the target repo's dossiers
+with a fixed format (Intent / Protected Invariants — each tied to its enforcing
+constraint or marked UNGUARDED / Constraints / Tradeoffs / Risks / Opportunities with
+the five-part opportunity format); (2) the workflow mandates reporting **unguarded
+invariants** — contracts with no enforcing HAS_CONSTRAINT edge — as the highest-value
+findings; (3) no engine changes, no review persistence until cross-session review
+querying becomes a real need; (4) pipeline-audit gains the cross-pass optimization-flow
+ledger (creates/blocks/tradeoff).
+Evidence: docs/validation/phase13/ — five review records; signature findings are all
+unguarded-invariant discoveries (merge-vf single-use assumption, AV2 verifier
+completeness, triton-to-annotation name validation, triton-to-linalg cross-dialect
+flatten contract).
+Consequences: reasoning provenance is visible by layer; the graph remains a facts-only
+contract; RG-1 stays backlog (ownership resolvable by reasoning).

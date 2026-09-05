@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–12 complete)
+Updated: 2026-09-05 (Phases 0–13 complete)
 
 ## Implemented
 
@@ -78,6 +78,12 @@ remains (`populate*` chasing) and did not block the workflows.
   (`pass-intent`), optimization opportunities as agent-layer dossier records;
   constraint substrate consumed by pass-analysis steps 7d/7e and pipeline-audit
   optimization-flow lens.
+
+- Phase 13 review intelligence (ADR-019, `docs/validation/phase13/`): three-layer
+  separation (graph facts / agent reasoning / evidence); Compiler Review Records for
+  five passes with unguarded-invariant findings (merge-vf single-use assumption, AV2
+  verifier completeness, annotation name validation, cross-dialect flatten contract);
+  workflows 7f + lens 1x; no engine changes.
 
 ## Current limitations
 

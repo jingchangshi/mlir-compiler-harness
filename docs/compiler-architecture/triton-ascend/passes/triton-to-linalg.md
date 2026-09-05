@@ -107,3 +107,21 @@ assumptions are the bufferization/ASCEND stages that follow in `make_ttgir`.
   before any mutation; invalid metadata fails the pass deterministically.
 
 - query facts: intent_label={'label': 'in-place rewrite/optimization', 'confidence': 'inferred'}; constraints={}
+
+# Compiler Review (Phase 13 — review record, agent layer)
+
+- **Why does this pass exist?** To reuse the AscendNPU-IR stack (Linalg→HIVM→hardware)
+  instead of building a Triton-native backend — the ecosystem handoff frontier.
+- **Protected invariants & enforcing constraints:** descriptor-handoff metadata
+  validated before any mutation (deterministic failure path); kernel classification
+  (mix-CV vs AIV) computed after SIMT materialization with the documented error-341
+  ordering rationale. **UNGUARDED**: the flatten-before-storage-align cross-dialect
+  contract (baseline side assumes flattened shapes; no verifier).
+- **Optimization opportunity (record):**
+  Current behavior: per-axis semantics are lost at flatten (reassociation pairs only).
+  Evidence: Phase 10 boundary + baseline mark-stride-align assumption.
+  Protected invariant: 1-D lowering simplicity. Lost opportunity: per-axis tile/cost
+  reasoning for future vectorization models. Possible direction: retain axis-identity
+  metadata through flatten (attribute contract across repos).
+- **Extension direction:** handoff-contract verifier between the two repos (Phase 11
+  ecosystem layer is the natural home).
