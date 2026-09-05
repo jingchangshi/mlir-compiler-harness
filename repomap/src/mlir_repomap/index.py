@@ -296,19 +296,88 @@ class Indexer:
                         return c, "same-dialect-heuristic"
             return cands[0], "ambiguous-class-name"
 
-        for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR"):
+        # derive pass-level dialect transitions from pattern op ownership (Phase 10):
+        # matched ops -> input dialect, created ops -> output dialect
+        op_dialect = {}
+        for dsrc, ddst in db.execute(
+                "SELECT src, dst FROM edges WHERE kind='DIALECT_OWNS' AND src LIKE 'dialect:%'"):
+            op_dialect[ddst] = dsrc
+        pass_patterns = {}
+        for src_, dst_ in db.execute(
+                "SELECT src, dst FROM edges WHERE kind='PASS_USES_PATTERN'"):
+            pass_patterns.setdefault(src_, set()).add(dst_)
+        for src_, dst_ in db.execute(
+                "SELECT src, dst FROM edges WHERE kind='PASS_USES_PATTERN_POPULATOR'"):
+            stack, seen = [dst_], set()
+            while stack:
+                cur = stack.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                for c in db.execute(
+                        "SELECT dst FROM edges WHERE kind='FUNCTION_CALLS' AND src=?",
+                        (cur,)):
+                    stack.append(c[0])
+                for pd in db.execute(
+                        "SELECT dst FROM edges WHERE kind='FUNCTION_DEFINES_PATTERN' AND src=?",
+                        (cur,)):
+                    pass_patterns.setdefault(src_, set()).add(pd[0])
+        for pas, pats in pass_patterns.items():
+            ins, outs = set(), set()
+            for pt in pats:
+                for mo in db.execute(
+                        "SELECT dst FROM edges WHERE kind='PATTERN_MATCHES_OP' AND src=?",
+                        (pt,)):
+                    d = op_dialect.get(mo[0])
+                    if d:
+                        ins.add(d)
+                for co in db.execute(
+                        "SELECT dst FROM edges WHERE kind='PATTERN_CREATES_OP' AND src=?",
+                        (pt,)):
+                    d = op_dialect.get(co[0])
+                    if d:
+                        outs.add(d)
+            for role, ds, via in (("output", outs, "created-ops"),
+                                  ("input", ins, "matched-ops")):
+                for d in ds:
+                    db.execute("INSERT OR IGNORE INTO edges (src,dst,kind,props) VALUES (?,?,?,?)",
+                               (pas, d, "DIALECT_TRANSITIONS_TO",
+                                '{"role": "%s", "via": "%s"}' % (role, via)))
+                    db.execute("INSERT INTO evidence SELECT edge_id,?,?,0,?, 'resolve', ? "
+                               "FROM edges WHERE src=? AND dst=? AND kind='DIALECT_TRANSITIONS_TO' "
+                               "AND props LIKE '%via%%' AND props LIKE ? LIMIT 1",
+                               (pas, d, "derived from pattern op ownership", "inferred",
+                                pas, d, '%"' + via + '"%'))
+
+        for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR",
+                     "DIALECT_TRANSITIONS_TO"):
             for eid, src in db.execute(
                     f"SELECT edge_id, src FROM edges WHERE kind='{kind}' "
                     "AND src LIKE 'pass_class:%'").fetchall():
                 cls = src.split(":", 1)[-1]
                 tgt, disamb = _pick_pass(cls, eid)
-                if tgt:
+                if not tgt:
+                    continue
+                try:
                     db.execute("UPDATE edges SET src=? WHERE edge_id=?",
                                (tgt, eid))
-                    if disamb:
-                        db.execute("UPDATE edges SET props=json_set(props,"
-                                   "'$.disambiguation',?) WHERE edge_id=?",
-                                   (disamb, eid))
+                except sqlite3.IntegrityError:
+                    # collision: an identical edge already exists for this pass;
+                    # merge evidence and drop the duplicate
+                    dup = db.execute(
+                        "SELECT edge_id FROM edges WHERE src=? AND dst=(SELECT dst "
+                        "FROM edges WHERE edge_id=?) AND kind=(SELECT kind FROM edges "
+                        "WHERE edge_id=?) AND props=(SELECT props FROM edges WHERE "
+                        "edge_id=?) AND edge_id<>?", (tgt, eid, eid, eid, eid)).fetchone()
+                    if dup:
+                        db.execute("UPDATE evidence SET edge_id=? WHERE edge_id=?",
+                                   (dup[0], eid))
+                        db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+                    continue
+                if disamb:
+                    db.execute("UPDATE edges SET props=json_set(props,"
+                               "'$.disambiguation',?) WHERE edge_id=?",
+                               (disamb, eid))
         # binding markers: BINDING_MAPS_TO -> function ids; PYTHON_COMPOSES -> bindings;
         # then expose passes through bindings (Python -> binding -> factory -> pass)
         binding_defs = {}

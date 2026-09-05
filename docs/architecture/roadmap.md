@@ -1,22 +1,21 @@
 # Roadmap
 
-done: Phase 0-9 (contract, engine, validation, workflows, adapters, deep validation,
+done: Phase 0-10 (contract, engine, validation, workflows, adapters, deep validation,
 provenance graph, provenance-aware workflows, ecosystem validation, cross-language
-provenance; ADR-001..015). Repos validated: AscendNPU-IR (baseline), triton-ascend
-(C++ + Python hybrid).
+provenance, semantic boundary graph; ADR-001..016). Repos: AscendNPU-IR (baseline),
+triton-ascend (C++ + Python hybrid).
 
 current: none.
 
-next (based on Phase 9 evidence):
-1. **Dialect-transition edges (EG-2 promotion candidate)**: with cross-language chains
-   in place, the triton→HIVM/HFusion handoff is now the visible frontier; a
-   DIALECT_TRANSITIONS edge (from pass input/output op ownership) would make ecosystem
-   audits queryable — requires a consuming workflow first (pass-analysis dialect
-   transition step).
-2. **RG-1 attribute-creator tracing**: marker-construction call sites (setAttr /
-   createAlignMarkOp) — both repos benefit.
-3. **pm.run stage markers as edges**: turn composition-function pm.run calls into
-   per-stage verification boundaries.
+next (based on Phase 10 evidence):
+1. **EG-1 remainder — Python pipeline extractor completion**: make_* stage lists as
+   first-class pipeline nodes (composition functions exist; stage-list nodes pending).
+2. **RG-1 attribute-creator tracing**: marker-construction call sites — upgrades
+   CREATES_ATTRIBUTE beyond inferred, strengthens semantic contracts.
+3. **Cross-repo handoff (QG-7)**: external-dialect declarations so triton-to-linalg /
+   triton_to_hivm output sides resolve across the two indexes.
+
+deferred (unchanged): MCP, clangd, attribute value semantics, full interpreter.
 
 deferred (unchanged): MCP, clangd, gtest coverage extraction, cross-repo handoff
 declarations (QG-7) — none blocking; the ecosystem now spans two repos with provenance.

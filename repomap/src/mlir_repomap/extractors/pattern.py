@@ -4,7 +4,7 @@ import re
 from .. import model
 
 RE_PATTERN_CLASS = re.compile(
-    r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\bpublic\s+'
+    r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\b(?:public\s+)?'
     r'(OpRewritePattern|OpConversionPattern|OpInterfaceConversionPattern|'
     r'OpInterfaceRewritePattern|RewritePattern|OpTraitRewritePattern)\s*<\s*([\w:]*)')
 RE_PATTERNS_ADD = re.compile(r'patterns\.add\s*<\s*([\w:\s,<>&]+?)\s*>\s*\(')

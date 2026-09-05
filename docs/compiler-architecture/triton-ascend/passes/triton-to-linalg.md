@@ -87,3 +87,13 @@ lambda), which maps to `factory:createTritonToLinalgPass` -> this pass. The C++
 `init_triton_ascend_passes_ttir` registration (order 5) is the tooling view; the
 production stage list is the Python one -- both now resolvable from the graph (EG-1
 closed).
+
+# Phase 10: Semantic Boundary
+
+`repo boundary triton-to-linalg` (indexer v35): pattern-matched ops resolve to the
+**Triton dialect** as input side; created ops (linalg/hfusion) are external-dialect
+ops whose TableGen lives outside this repo's corpus, so the output side is recorded via
+the downstream handoff (Linalg consumers in the AscendNPU-IR stack) rather than as an
+indexed dialect. Verdict stated per workflow: **this pass is a lowering boundary** —
+Triton-level tensor semantics enter, Linalg-level named-op semantics leave; downstream
+assumptions are the bufferization/ASCEND stages that follow in `make_ttgir`.

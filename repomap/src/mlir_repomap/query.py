@@ -415,6 +415,59 @@ class QueryService:
                                  self.store.edges_from(nid, model.PASS_HAS_FACTORY)]
         return out
 
+    def dialect_transition(self, name):
+        """Dialect transitions of a pass (Phase 10): input/output dialects with
+        evidence, plus derived dialect->dialect pairs."""
+        r = self._resolve_pass(name)
+        if r is None or (isinstance(r[1], dict) and "error" in r[1]):
+            return r[1] if isinstance(r[1], dict) else {"error": "not found"}
+        nid, node = r
+        ins, outs = [], []
+        for e in self._evidence_summary(
+                self.store.edges_from(nid, model.DIALECT_TRANSITIONS_TO)):
+            d = self._node_or_none(e["dst"]) or {"id": e["dst"]}
+            entry = {"dialect": e["dst"], "node": d, "role": e["props"].get("role"),
+                     "via": e["props"].get("via"), "confidence": e["confidence"],
+                     "evidence": e["evidence"]}
+            (outs if e["props"].get("role") == "output" else ins).append(entry)
+        pairs = [{"from": i["dialect"], "to": o["dialect"]}
+                 for i in ins for o in outs]
+        return {"pass": node, "input_dialects": ins, "output_dialects": outs,
+                "transitions": pairs}
+
+    def semantic_contract(self, name):
+        """Attribute semantic contract: role + producers + consumers."""
+        r = self.get_attribute(name)
+        if "error" in r:
+            return r
+        node = r["attribute"]
+        role = (node.get("summary") or "").replace("role: ", "").replace(" (heuristic)", "")
+        return {"attribute": node,
+                "role": role or "unknown",
+                "producers": r["created_by"],
+                "consumers": r["referenced_by"]}
+
+    def boundary(self, name):
+        """IR boundary contract of a pass: why this is a lowering boundary."""
+        r = self.dialect_transition(name)
+        if "error" in r:
+            return r
+        created = set()
+        for e in self.store.edges_from(r["pass"]["id"], model.PASS_USES_PATTERN):
+            for c in self.store.edges_from(e["dst"], model.PATTERN_CREATES_OP):
+                created.add(c["dst"])
+        for c in r["composition"] if "composition" in r else []:
+            pass
+        succ = set()
+        for m in self.get_pass(name).get("pipeline_memberships", []):
+            succ.update(m.get("successor") or [])
+        return {"pass": r["pass"],
+                "input_dialects": r["input_dialects"],
+                "output_dialects": r["output_dialects"],
+                "transitions": r["transitions"],
+                "created_ops": sorted(created),
+                "downstream_assumptions": sorted(succ)}
+
     def get_evidence(self, ident):
         if ident.startswith("file:"):
             return {"evidence": []}

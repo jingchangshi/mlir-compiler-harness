@@ -29,6 +29,9 @@ def main(argv=None):
     p = sub.add_parser("pipeline-builder"); p.add_argument("name")
     p = sub.add_parser("attribute"); p.add_argument("name")
     p = sub.add_parser("pipeline-composition"); p.add_argument("name")
+    p = sub.add_parser("dialect-transition"); p.add_argument("name")
+    p = sub.add_parser("semantic-contract"); p.add_argument("name")
+    p = sub.add_parser("boundary"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
 
     args = ap.parse_args(argv)
@@ -57,7 +60,10 @@ def main(argv=None):
               "pattern-owner": lambda: svc.pattern_owner(args.name),
               "pipeline-builder": lambda: svc.pipeline_builder(args.name),
               "attribute": lambda: svc.get_attribute(args.name),
-              "pipeline-composition": lambda: svc.pipeline_composition(args.name)}[args.cmd]
+              "pipeline-composition": lambda: svc.pipeline_composition(args.name),
+              "dialect-transition": lambda: svc.dialect_transition(args.name),
+              "semantic-contract": lambda: svc.semantic_contract(args.name),
+              "boundary": lambda: svc.boundary(args.name)}[args.cmd]
         result = fn()
     finally:
         svc.close()

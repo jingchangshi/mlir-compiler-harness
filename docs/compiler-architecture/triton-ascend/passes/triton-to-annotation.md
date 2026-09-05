@@ -81,3 +81,17 @@ value tracking — RG-1 territory, backlog.
 C++ registration and before `triton_to_hivm` in the Python stage list because the baseline
 stack's annotation consumers require marks to exist before HIVM lowering -- now
 evidenced by both composition frontends from one query.
+
+# Phase 10: Semantic Boundary
+
+`repo boundary triton-to-annotation` (indexer v35):
+
+- input dialect: `TritonAscend` (inferred — pattern matched ops ownership)
+- output dialect: `Annotation` (**confirmed**, TritonToAnnotation.cpp:64
+  `target.addLegalDialect<annotation::AnnotationDialect>()`)
+- transition pair: `TritonAscend → Annotation`
+- created ops: `annotation::MarkOp` (all attributes forwarded — the semantic contract
+  is the attribute payload, consumed by the baseline repo's stride-align machinery)
+
+This is the cleanest semantic boundary in the Ascend flow: a one-op dialect transition
+whose entire meaning is the attribute contract.

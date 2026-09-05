@@ -121,6 +121,38 @@ def extract(relpath, text):
                           "kind": model.BINDING_MAPS_TO, "props": {},
                           "evidence": ev(ln)})
 
+    # ConversionTarget dialect transitions (Phase 10): legal = output side,
+    # illegal = input side. Attributed to the nearest preceding pass class.
+    class_starts = [(m.start(), m.group(1)) for m in RE_PASS_CLASS.finditer(text)]
+
+    def _enclosing_class(pos):
+        cand = None
+        for p, c in class_starts:
+            if p <= pos:
+                cand = c
+            else:
+                break
+        return cand
+
+    for m in re.finditer(r'\badd(Legal|Illegal)Dialect\s*<\s*[\w:]*?(\w+?)Dialect\s*>', text):
+        role, name = ("output" if m.group(1) == "Legal" else "input"), m.group(2)
+        ln = line_of(m.start())
+        owner = _enclosing_class(m.start())
+        if not owner:
+            continue
+        edges.append({"src": f"pass_class:{owner}", "dst": f"dialect:{name}",
+                      "kind": model.DIALECT_TRANSITIONS_TO,
+                      "props": {"role": role}, "evidence": ev(ln)})
+    for m in re.finditer(r'\badd(Legal|Illegal)Op\s*<\s*(\w+)\s*>', text):
+        role = "output" if m.group(1) == "Legal" else "input"
+        ln = line_of(m.start())
+        owner = _enclosing_class(m.start())
+        if not owner:
+            continue
+        edges.append({"src": f"pass_class:{owner}", "dst": f"op:{m.group(2)}",
+                      "kind": model.DIALECT_TRANSITIONS_TO,
+                      "props": {"role": role}, "evidence": ev(ln)})
+
     # IR attribute name references (QG-4): `XxxAttr::name` and `kXxxAttr` constants
     attr_hits = {}
     for m in re.finditer(r'\b(\w+Attr)::name', text):
@@ -131,9 +163,24 @@ def extract(relpath, text):
         nm = m.group(1)
         ln = line_of(m.start())
         attr_hits.setdefault(nm, ln)
+    ROLES = (("align", "stride"), "memory alignment contract"), \
+            (("core_type", "coretype", "tcore"), "core-type assignment"), \
+            (("annotation",), "annotation carrier"), \
+            (("storage_aligned",), "storage-alignment marker"), \
+            (("vector_function", "vf"), "vector-function marker"), \
+            ("layout", "layout contract"), \
+            ("tiling", "tiling contract"),             ("sync", "synchronization contract")
+    def _role(nm):
+        low = nm.lower()
+        for keys, role in ROLES:
+            if any(k in low for k in keys):
+                return role
+        return None
     for nm, ln in sorted(attr_hits.items()):
+        role = _role(nm)
         nodes.append({"id": f"attribute:{nm}", "kind": model.ATTRIBUTE, "name": nm,
-                      "summary": "", "file": relpath, "line": ln})
+                      "summary": f"role: {role} (heuristic)" if role else "",
+                      "file": relpath, "line": ln})
         edges.append({"src": f"file:{relpath}", "dst": f"attribute:{nm}",
                       "kind": model.REFERENCES, "props": {"via": "Attr-ref"},
                       "evidence": ev(ln)})

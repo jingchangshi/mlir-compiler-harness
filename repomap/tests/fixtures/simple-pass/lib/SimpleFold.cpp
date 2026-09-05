@@ -157,3 +157,19 @@ void SimpleFoldPass::runOnOperation() {
 // touch
 
 // touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch
+
+// touch

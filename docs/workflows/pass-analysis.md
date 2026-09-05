@@ -55,6 +55,14 @@ query would have answered it (feeds the query-API review).
 7. **Output invariant** — what the pass guarantees afterwards; what downstream passes
    rely on (successor passes + their input handling).
 
+7a. **Semantic boundary analysis** — run `mlir-repomap boundary <pass>` and answer:
+    *what abstraction changes here?* — input dialects, output dialects, created ops,
+    downstream assumptions, and the dialect→dialect transition pairs. A pass with
+    transitions is a lowering boundary and the dossier must say so explicitly
+    ("this pass is a lowering boundary because: input dialect …, output dialect …,
+    created ops …, downstream assumptions …"); a pass with none is an
+    optimization/analysis pass at its position — also state that.
+
 7b. **Pattern provenance** — if the pass registers rewrite patterns (direct or via
    populator chains): for each pattern run `mlir-repomap pattern-owner <Pattern>` and
    document the **ownership path**: Pass → populator function (file:line, call site) →

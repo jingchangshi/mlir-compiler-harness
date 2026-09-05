@@ -39,6 +39,13 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1a. **Dialect-transition lens** — for the pipeline's stages, run
+   `mlir-repomap dialect-transition <pass>` (or `boundary`) and assemble the dialect
+   evolution: pipeline stage → dialect transitions → hardware boundary. Mark the stage
+   where the *abstraction level drops* (high-level tensor/loop IR → hardware-aware IR)
+   and every pass whose input dialect is another stage's output dialect — those
+   input/output pairs are the pipeline's semantic spine.
+
 1b. **Cross-language provenance lens** — every pipeline must answer: *where does it
    originate?* If stages cannot be explained by C++ builders, run
    `mlir-repomap pipeline-composition <pass>` per stage and reconstruct the chain

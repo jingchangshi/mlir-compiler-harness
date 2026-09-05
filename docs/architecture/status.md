@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–9 complete)
+Updated: 2026-09-05 (Phases 0–10 complete)
 
 ## Implemented
 
@@ -62,6 +62,11 @@ remains (`populate*` chasing) and did not block the workflows.
   detection) + full chain resolution; `pipeline-composition` query; pipeline-kind
   correctness (runOnOperation fix); triton-ascend 15 chains mapped; AscendNPU-IR
   regression clean.
+
+- Phase 10 semantic boundary graph (ADR-016, `docs/validation/phase10/`):
+  DIALECT_TRANSITIONS_TO edges (ConversionTarget-confirmed + pattern-ownership-inferred),
+  attribute semantic roles (heuristic keyword table), boundary/dialect-transition/
+  semantic-contract queries, workflow steps 7a + lens 1a; EG-2 closed.
 
 ## Current limitations
 

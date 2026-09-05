@@ -223,3 +223,25 @@ RegBase builders intact), two dossier "why here" upgrades. Implementation notes:
 parsing via stdlib ast with BOM stripping (vendor files carry U+FEFF).
 Consequences: Python-pipeline provenance is now a generic capability, not a Triton
 feature; attribute creator semantics (RG-1) and pm.run verification edges remain open.
+
+## ADR-016 (2026-09-05, accepted) — Semantic boundary graph: dialect transitions + lightweight attribute roles
+
+Context: Phases 6-9 answered construction provenance ("who/where/why here"); Phase 10
+targets semantic boundaries ("what abstraction changes here").
+Decision:
+1. `DIALECT_TRANSITIONS_TO` edges with `role: input|output`, two evidence paths:
+   confirmed from the `ConversionTarget` idiom (namespace-qualified dialect names
+   supported, attributed to the enclosing pass class) and inferred from pattern op
+   ownership propagated through populator chains. Dialect→dialect pairs derived at query
+   time, not stored.
+2. Attribute semantic roles are lightweight keyword-derived node annotations
+   (`heuristic` confidence), deliberately NOT an attribute evaluator; agent reasoning
+   completes roles the table cannot express (validated on
+   RegisterTreeReductionSelectedAttr).
+3. Queries `dialect-transition <pass>`, `semantic-contract <attr>`, `boundary <pass>`,
+   each with workflow consumers added in the same phase (pass-analysis step 7a,
+   pipeline-audit lens 1a).
+Evidence: docs/validation/phase10/ — triton-to-annotation's TritonAscend→Annotation
+transition fully evidenced; both repos rebuilt; no regressions.
+Consequences: EG-2 closed; the boundary question is answerable per pass; external-dialect
+outputs (cross-repo boundaries) remain the known limit (QG-7).
