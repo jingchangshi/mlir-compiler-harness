@@ -116,3 +116,18 @@ Evidence: validation-adapters.md — 9/9 fact consistency between an independent
 DeepSeek-style run and the Phase 3 dossier; ZCode skills trigger-resolve correctly.
 Consequences: adapters stay small and safe to regenerate; engine/contract fixes during
 validation (pass-name resolution, `pipeline --brief`) needed no adapter rewording.
+
+## ADR-011 (2026-09-05, accepted) — Phase 5 outcome: gaps recorded, not implemented; next investment ranked by observed friction
+
+Context: Phase 5 ran six expert-level pass analyses and one pipeline audit through the
+ZCode adapter. Three recurring gaps were observed (see docs/validation/phase5/query-gaps.md):
+free-function `populate*` pattern ownership (6/6 analyses affected, QG-3, High);
+same-name pipeline builder merge (QG-1, High); attribute-level producer/consumer queries
+(QG-4, Medium). No analysis was hard-blocked, and no wrong fact was produced by the graph.
+Decision: record gaps instead of implementing (per Phase 5 rules). Rank next-phase
+candidates by observed friction: C (pattern extraction enhancement = QG-3/QG-1 fixes)
+first; then D (schema enhancement: attr entities from QG-4 + test feature tags from QG-5);
+MCP (A) and clangd (B) remain deferred — no hot-path pressure and no wrong-fact incident
+were observed.
+Consequences: the engine stays frozen at Phase 4 while its gap log carries the next
+phase's backlog; workflow gaps (WG-1..5) are cheap doc changes to fold into the next phase.

@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–4 complete)
+Updated: 2026-09-05 (Phases 0–5 complete)
 
 ## Implemented
 
@@ -34,6 +34,12 @@ remains (`populate*` chasing) and did not block the workflows.
   ADR-010. Validation drove two contract fixes: multi-strategy pass-name resolution with
   explicit ambiguity, and `pipeline --brief`.
 
+- Phase 5 ZCode-driven deep validation on AscendNPU-IR (`docs/validation/phase5/`):
+  six expert-level pass dossiers (MergeVecScope, HFusionFlattenOps, MarkStrideAlign,
+  EnableStrideAlign, AutoVectorizeV2, VFFusion) + a regbase contract/ordering/abstraction
+  audit, all produced through the ZCode skills. Outcome: no hard blockers; gaps logged
+  (QG-1..6, WG-1..5) and ranked in ADR-011.
+
 ## Current limitations
 
 - `populateXxxPatterns()` free-function chasing still missing (139/79 coverage, not 332/332).
@@ -48,4 +54,5 @@ remains (`populate*` chasing) and did not block the workflows.
 
 ## Next recommended phase
 
-See roadmap.md (adapter usage hardening / MCP decision deferred until hot-path evidence).
+Pattern extraction enhancement (QG-3 populate*-chasing + QG-1 pipeline identity) — see
+roadmap.md and ADR-011.
