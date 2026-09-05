@@ -97,3 +97,13 @@ the downstream handoff (Linalg consumers in the AscendNPU-IR stack) rather than 
 indexed dialect. Verdict stated per workflow: **this pass is a lowering boundary** —
 Triton-level tensor semantics enter, Linalg-level named-op semantics leave; downstream
 assumptions are the bufferization/ASCEND stages that follow in `make_ttgir`.
+# Phase 12: Intent & Constraints
+
+- intent (graph): label **"in-place rewrite/optimization" (inferred — pattern-driven)**;
+  stated intent "Convert Triton to Linalg dialect". Constraint extraction found no
+  failure-family guards in the class body (the pass reports via signalPassFailure paths
+  that live in helper functions outside method-span coverage — known extraction limit).
+- boundary constraints (from Phase 10): descriptor-handoff metadata validation runs
+  before any mutation; invalid metadata fails the pass deterministically.
+
+- query facts: intent_label={'label': 'in-place rewrite/optimization', 'confidence': 'inferred'}; constraints={}

@@ -33,6 +33,7 @@ file-qualified candidates. `PIPELINE_CONTAINS` edges carry both `order` (per-sco
 | `test` | `test:<repo-relative-path>` | files with `RUN:` lines; `summary` carries heuristic `features:` tags (dynamic-shape, reduction, fusion, vectorization, bufferization, stride-align, nested-region) |
 | `function` | `function:<file>:<name>` | C++ functions that take `RewritePatternSet&` (pattern-set helpers/populators), pipeline builders, and **Python pipeline-composition functions** (signature-based: pass-manager param/usage, never name-based) |
 | `binding` | `binding:<name>` | PyBind-style binding boundary: a string name mapped to a C++ function/factory via `m.def("name", fn)` or wrapper macros; lambda bodies are brace-matched to find the mapped factory |
+| `constraint` | `constraint:<file>:<line>` | deterministic optimization constraint inside a pass implementation: legality guards (`return failure()` with captured condition), match failures (with literal reason), terminal pass failures, TODO/FIXME notes. Intentionally NOT an intent/decision node — agent interpretation lives in dossier docs (ADR-018) |
 | `attribute` | `attribute:<Name>` | IR attribute names referenced as `<Name>Attr::name` |
 | `symbol` | `func:<name>` / `cppclass:<Name>` | free C++ functions/classes of interest |
 | `file` | `file:<relpath>` | git tracked files (lightweight; for provenance queries) |
@@ -64,6 +65,7 @@ Directed; `src`/`dst` are node ids. Edge kinds (MVP set):
 | `BINDING_MAPS_TO` | binding -> C++ function/factory | PyBind def / wrapper macro / lambda body factory call | confirmed (ADR-015) |
 | `PYTHON_COMPOSES` | Python composition function -> binding | `passes.<group>.add_*(pm, ...)` stage call inside a composition function | confirmed |
 | `BINDING_EXPOSES_PASS` | binding -> pass | resolved chain binding -> factory -> pass | confirmed (ADR-015) |
+| `HAS_CONSTRAINT` | pass -> constraint | guard inside the pass implementation (early-return / legality-guard / match-failure / pass-failure / todo) | confirmed (ADR-018) |
 | `CREATES_ATTRIBUTE` | pass -> attribute | `<Name>Attr::name` referenced inside pass class body | inferred |
 | `REFERENCES` | generic symbol reference fallback | text search | heuristic |
 | `PATTERN_MATCHES_OP` | pattern -> op | template arg of OpRewritePattern/OpConversionPattern | confirmed |

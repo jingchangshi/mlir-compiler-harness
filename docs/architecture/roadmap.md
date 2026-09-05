@@ -1,17 +1,20 @@
 # Roadmap
 
-done: Phase 0-11 (…, semantic boundary graph, cross-repository handoff graph;
-ADR-001..017). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer
+done: Phase 0-12 (…, cross-repository handoff graph, intent & optimization reasoning;
+ADR-001..018). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer
 over both.
 
 current: none.
 
-next (based on Phase 11 evidence):
-1. **EG-1 remainder — Python stage lists as first-class pipeline nodes** (carried).
-2. **RG-1 attribute-creator tracing** — now ecosystem-relevant: the 5 cross-repo
-   attribute contracts would gain confirmed ownership sides.
-3. **Ecosystem persistence + more repos**: persist handoff edges in an ecosystem index
-   and onboard a third Ascend repo (backend/compiler) when available.
+next (based on Phase 12 evidence):
+1. **RG-1 attribute-creator tracing** (promoted): marker-construction call sites —
+   completes attribute contracts (ecosystem + semantic layers both consume it).
+2. **Constraint equivalence classes** (small): group per-occurrence constraints by
+   condition semantics to power cross-pass reasoning.
+3. **EG-1 remainder** (carried): Python stage lists as first-class pipeline nodes.
+
+deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics —
+the intent/constraint layer reduced the pressure for all of them.
 
 deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
 

@@ -350,7 +350,8 @@ class Indexer:
                                 pas, d, '%"' + via + '"%'))
 
         for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR",
-                     "DIALECT_TRANSITIONS_TO", "CREATES_ATTRIBUTE"):
+                     "DIALECT_TRANSITIONS_TO", "CREATES_ATTRIBUTE",
+                     "HAS_CONSTRAINT"):
             for eid, src in db.execute(
                     f"SELECT edge_id, src FROM edges WHERE kind='{kind}' "
                     "AND src LIKE 'pass_class:%'").fetchall():

@@ -34,6 +34,8 @@ to re-index; workflows must refresh before reasoning if stale).
 | `attribute <name>` | get_attribute(name) | attribute provenance: referencing files (heuristic) + confirmed creating pass classes |
 | `pipeline-composition <pass>` | pipeline_composition(name) | cross-language construction chain: Python composition function → binding → C++ factory → pass, with evidence |
 | `ecosystem --repos A --repos B <status\|handoff\|boundary\|contract> [name]` | EcosystemQueryService | cross-repository handoff graph: dialect/op/attribute handoffs between repo indexes, per-repo boundary view, shared attribute contracts (ADR-017) |
+| `pass-intent <pass>` | pass_intent(name) | layered compiler intent: graph facts only (stated intent, deterministic label with confidence, boundary evidence, constraint counts) — agent interpretation stays in dossiers (ADR-018) |
+| `pass-constraints <pass>` | pass_constraints(name) | deterministic constraint records: kind (legality-guard/match-failure/early-return/pass-failure/todo), condition text, evidence line |
 
 Token discipline: every command returns compact JSON with `file:line` pointers, never file
 contents; the agent opens only what it needs. `pass <name>` is the one-stop dossier for the

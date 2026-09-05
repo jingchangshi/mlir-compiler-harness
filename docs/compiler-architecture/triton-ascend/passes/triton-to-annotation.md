@@ -95,3 +95,14 @@ evidenced by both composition frontends from one query.
 
 This is the cleanest semantic boundary in the Ascend flow: a one-op dialect transition
 whose entire meaning is the attribute contract.
+# Phase 12: Intent & Constraints
+
+- intent (graph): label **"lowering/conversion boundary" (inferred)** — TritonAscend →
+  Annotation transition (Phase 10). Constraint: 1 legality-guard — partial-conversion
+  failure (signalPassFailure if any AnnotationOp remains unconverted).
+- agent interpretation: the pass exists to make Triton-originated annotations legible to
+  the AscendNPU-IR baseline contract machinery (stride-align etc.); its constraint set is
+  intentionally minimal because the semantic payload travels in attributes, not ops.
+
+- query facts: intent_label={'label': 'lowering/conversion boundary', 'confidence': 'inferred'}; constraints={'legality-guard': 1}
+  - `legality-guard`: failed(applyPartialConversion(module, target, std::move(patterns (third_party/ascend/lib/TritonToAnnotation/TritonToAnnotation.cpp:69)

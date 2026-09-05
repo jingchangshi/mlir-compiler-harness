@@ -66,6 +66,20 @@ query would have answered it (feeds the query-API review).
     created ops …, downstream assumptions …"); a pass with none is an
     optimization/analysis pass at its position — also state that.
 
+7d. **Intent analysis** — run `mlir-repomap pass-intent <pass>`; the query returns
+    graph-derived intent facts (stated intent from td, deterministic label with
+    confidence, boundary evidence, constraint counts). The dossier must separate:
+    graph fact (query output) vs **agent interpretation** ("why does this pass
+    exist?" — your reasoning, explicitly labeled as such). Never write an
+    interpretation into the graph or present a heuristic label as confirmed.
+
+7e. **Constraint analysis** — run `mlir-repomap pass-constraints <pass>`; each
+    legality-guard / match-failure / early-return / pass-failure record is a
+    deterministic fact (condition text + evidence line). Use them to answer *"what
+    prevents this optimization from applying?"* and record **optimization
+    opportunities** in the dossier (Current / Evidence / Impact / Possible direction)
+    — opportunities are agent-layer records, never engine facts.
+
 7c. **Cross-repository contract** — if the pass outputs an artifact consumed by another
     repository in the ecosystem (dialect, op, attribute — visible via
     `mlir-repomap ecosystem handoff <name>` with `--repos` covering the stack), the

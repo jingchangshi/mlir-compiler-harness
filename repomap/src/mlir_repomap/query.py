@@ -468,6 +468,61 @@ class QueryService:
                 "created_ops": sorted(created),
                 "downstream_assumptions": sorted(succ)}
 
+    def pass_constraints(self, name):
+        r = self._resolve_pass(name)
+        if r is None or (isinstance(r[1], dict) and "error" in r[1]):
+            return r[1] if isinstance(r[1], dict) else {"error": "not found"}
+        nid, node = r
+        out = []
+        for e in self._evidence_summary(
+                self.store.edges_from(nid, model.HAS_CONSTRAINT)):
+            c = self._node_or_none(e["dst"]) or {"id": e["dst"]}
+            out.append({"constraint": e["dst"], "kind": e["props"].get("kind"),
+                        "text": c.get("summary"), "confidence": e["confidence"],
+                        "evidence": e["evidence"]})
+        by_kind = {}
+        for c in out:
+            by_kind[c["kind"]] = by_kind.get(c["kind"], 0) + 1
+        return {"pass": node, "constraints": out, "counts": by_kind}
+
+    def pass_intent(self, name):
+        """Layered compiler intent: graph facts only; agent interpretation lives in
+        the dossier layer and is deliberately absent here (ADR-018)."""
+        r = self._resolve_pass(name)
+        if r is None or (isinstance(r[1], dict) and "error" in r[1]):
+            return r[1] if isinstance(r[1], dict) else {"error": "not found"}
+        nid, node = r
+        b = self.boundary(name)
+        ins = [d["dialect"] for d in b.get("input_dialects", [])]
+        outs = [d["dialect"] for d in b.get("output_dialects", [])]
+        cons = self.pass_constraints(name)
+        comp = self.pipeline_composition(name)
+        n_patterns = len(self.get_pass(name).get("patterns", []))
+        # deterministic intent label: graph facts first, name/summary keywords as
+        # heuristic fallback (never presented as confirmed)
+        blob = ((node.get("summary") or "") + " " + name).lower()
+        if outs:
+            label, conf = "lowering/conversion boundary", "inferred"
+        elif n_patterns:
+            label, conf = "in-place rewrite/optimization", "inferred"
+        elif any(k in blob for k in ("vectorize", "fuse", "merge", "optimize",
+                                     "simplify", "canonicaliz", "fold", "hoist",
+                                     "pipeline", "tile", "unroll")):
+            label, conf = "optimization pass (name/summary heuristic)", "heuristic"
+        elif any(m.get("nested") for m in self.get_pass(name).get("pipeline_memberships", [])):
+            label, conf = "structural/scheduling pass", "heuristic"
+        else:
+            label, conf = "structural pass", "heuristic"
+        return {"pass": node,
+                "stated_intent": node.get("summary"),
+                "intent_label": {"label": label, "confidence": conf},
+                "evidence": {"input_dialects": ins, "output_dialects": outs,
+                             "pattern_count": n_patterns,
+                             "composition_chains": len(comp.get("composition", []))
+                             if isinstance(comp, dict) else 0},
+                "constraints": {"counts": cons.get("counts", {}),
+                                "items": cons.get("constraints", [])[:12]}}
+
     def get_evidence(self, ident):
         if ident.startswith("file:"):
             return {"evidence": []}

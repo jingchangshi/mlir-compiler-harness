@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–11 complete)
+Updated: 2026-09-05 (Phases 0–12 complete)
 
 ## Implemented
 
@@ -72,6 +72,12 @@ remains (`populate*` chasing) and did not block the workflows.
   layer derives dialect/op/attribute handoffs across the two repo indexes; 2 confirmed
   dialect handoffs (Annotation, HIVM), 10 op handoffs, 5 shared attribute contracts;
   `mlir-repomap ecosystem` query family; QG-7 closed at ecosystem level.
+
+- Phase 12 intent & reasoning (ADR-018, `docs/validation/phase12/`): deterministic
+  constraint extraction (177 on AscendNPU-IR, 171 pass-level), layered intent view
+  (`pass-intent`), optimization opportunities as agent-layer dossier records;
+  constraint substrate consumed by pass-analysis steps 7d/7e and pipeline-audit
+  optimization-flow lens.
 
 ## Current limitations
 

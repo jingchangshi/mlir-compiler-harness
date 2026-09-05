@@ -54,8 +54,11 @@ def extract(relpath, text):
         region = text[m.start():end]
         sm = re.search(r'let summary\s*=\s*"([^"]*)"', region)
         summary = sm.group(1) if sm else ""
+        dm = re.search(r'let description\s*=\s*\[\[(.*?)\]\]', region, re.S)
+        description = re.sub(r'\s+', ' ', dm.group(1)).strip()[:280] if dm else ""
         nid = f"pass:{arg}"
-        nodes.append({"id": nid, "kind": model.PASS, "name": arg, "summary": summary,
+        nodes.append({"id": nid, "kind": model.PASS, "name": arg,
+                      "summary": (summary + (" — " + description if description else ""))[:300],
                       "file": relpath, "line": ev(m)["line_start"]})
         edges.append({"src": f"file:{relpath}", "dst": nid, "kind": model.DEFINES,
                       "props": {"tblgen_class": cls}, "evidence": ev(m)})

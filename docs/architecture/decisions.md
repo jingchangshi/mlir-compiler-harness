@@ -286,3 +286,22 @@ Evidence: docs/validation/phase11/ — 2 confirmed dialect handoffs (Annotation,
 5 cross-repo attribute contracts, complete triton-ascend boundary view.
 Consequences: QG-7 closed at the ecosystem level; handoff matching is name-based
 (versioned artifact identity remains open); runtime-level handoffs out of scope.
+
+## ADR-018 (2026-09-05, accepted) — Intent & constraints: deterministic substrate, agent-owned reasoning
+
+Context: the ecosystem graph answers construction/semantic questions; review workflows
+need "why does this pass exist / what blocks this optimization".
+Decision: (1) constraints are deterministic per-occurrence graph facts —
+`constraint:<file>:<line>` nodes + HAS_CONSTRAINT pass edges for legality-guards,
+match-failures, terminal pass-failures and TODO/FIXME notes, extracted from pass classes
+AND out-of-line method bodies; (2) intent is a LAYERED VIEW (`pass-intent`): graph facts
+only (td stated intent, deterministic label with confidence, boundary evidence,
+constraint counts) — agent interpretation must stay in dossier sections explicitly
+labeled as reasoning; the engine never records interpretation; (3) optimization
+opportunities are dossier-layer records (no query, no node) built on the constraint
+substrate.
+Evidence: docs/validation/phase12/ — 177 constraints on AscendNPU-IR (171 pass-level),
+five dossiers upgraded with separated fact/interpretation sections.
+Consequences: the graph cannot "lie" about design intent; reasoning provenance is
+visible by which layer a claim comes from. Multi-line condition truncation and
+helper-scoped guards are recorded limitations.

@@ -39,6 +39,12 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1y. **Optimization flow lens** — using `pass-intent` / `pass-constraints` across the
+   pipeline's stages, report which optimization opportunities are **created** (a stage
+   enables a later one) and which are **lost** (a guard blocks a fusion/layout/scheduling
+   opportunity — cite the constraint's evidence line). Opportunities are agent-layer
+   conclusions over deterministic constraint facts; label them accordingly.
+
 1z. **Ecosystem boundary lens** — when the pipeline's final stages produce IR for
    another compiler repository (visible via
    `mlir-repomap ecosystem handoff --repos <stack repos>`), record the handoff:

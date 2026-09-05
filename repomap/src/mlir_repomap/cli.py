@@ -37,6 +37,8 @@ def main(argv=None):
     p = sub.add_parser("dialect-transition"); p.add_argument("name")
     p = sub.add_parser("semantic-contract"); p.add_argument("name")
     p = sub.add_parser("boundary"); p.add_argument("name")
+    p = sub.add_parser("pass-intent"); p.add_argument("name")
+    p = sub.add_parser("pass-constraints"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
 
     args = ap.parse_args(argv)
@@ -89,7 +91,9 @@ def main(argv=None):
               "pipeline-composition": lambda: svc.pipeline_composition(args.name),
               "dialect-transition": lambda: svc.dialect_transition(args.name),
               "semantic-contract": lambda: svc.semantic_contract(args.name),
-              "boundary": lambda: svc.boundary(args.name)}[args.cmd]
+              "boundary": lambda: svc.boundary(args.name),
+              "pass-intent": lambda: svc.pass_intent(args.name),
+              "pass-constraints": lambda: svc.pass_constraints(args.name)}[args.cmd]
         result = fn()
     finally:
         svc.close()
