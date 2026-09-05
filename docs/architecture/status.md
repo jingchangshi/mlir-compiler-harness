@@ -85,6 +85,13 @@ remains (`populate*` chasing) and did not block the workflows.
   verifier completeness, annotation name validation, cross-dialect flatten contract);
   workflows 7f + lens 1x; no engine changes.
 
+- Phase 15 attribute creator precision (ADR-021, `docs/validation/phase15/`): RG-1
+  closed — `attribute-provenance` query joins td definitions (attr + DIALECT_OWNS),
+  container-typed creators (OpBuilder/RewritePattern/ConversionPattern/Pass/
+  PipelineBuilder with attach flags) and typed consumers (verifier/reader); old
+  containment-based creator edges replaced (false positives removed); workflows 5b +
+  lens 2/lens 1e upgraded; real chains validated on both repos; tests 32/32.
+
 - Phase 14 knowledge evolution loop (ADR-020, `docs/validation/phase14/`): findings
   are doc-layer YAML artifacts with a validated lifecycle (open → … → resolved /
   rejected / superseded; every transition needs reason + evidence) and deterministic
@@ -113,5 +120,5 @@ remains (`populate*` chasing) and did not block the workflows.
 
 ## Next recommended phase
 
-Attribute creator precision (RG-1) — see roadmap.md and ADR-020 (§8 of the phase 14
-validation record).
+Finding-resolution assists (test-coverage churn, constraint re-extraction diff,
+ecosystem contract validation for TTA-001) — see roadmap.md and ADR-021.

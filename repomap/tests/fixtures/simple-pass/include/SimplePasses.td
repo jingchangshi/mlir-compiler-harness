@@ -7,3 +7,6 @@ def Simple_FoldOp : Op<SimpleDialect, "fold"> {
 def SimpleFoldPass : Pass<"simple-fold", "func::FuncOp"> {
   let summary = "folds simple ops";
 }
+def Simple_MagicAttr : AttrDef<SimpleDialect, "magic"> {
+  let summary = "magic marker attribute";
+}

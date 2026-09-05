@@ -82,17 +82,28 @@ class FixtureTest(unittest.TestCase):
 
     def test_incremental_reextracts_on_touch(self):
         target = os.path.join(self.repo, "lib", "SimpleFold.cpp")
-        with open(target, "a") as f:
-            f.write("\n// touch\n")
-        idx = Indexer(self.repo)
-        stats = idx.build()
-        idx.close()
-        self.assertEqual(stats["reextracted"], 1)
-        # dossier still complete after re-extraction
-        svc = QueryService(self.repo)
-        r = svc.get_pass("simple-fold")
-        svc.close()
-        self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
+        with open(target) as f:
+            original = f.read()
+        try:
+            with open(target, "a") as f:
+                f.write("\n// touch\n")
+            idx = Indexer(self.repo)
+            stats = idx.build()
+            idx.close()
+            self.assertEqual(stats["reextracted"], 1)
+            # dossier still complete after re-extraction
+            svc = QueryService(self.repo)
+            r = svc.get_pass("simple-fold")
+            svc.close()
+            self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
+        finally:
+            with open(target, "w") as f:
+                f.write(original)
+            # re-sync the stored hash with the restored content so later
+            # incremental tests still see an unchanged tree
+            idx = Indexer(self.repo)
+            idx.build()
+            idx.close()
 
     def test_pass_resolution_by_class_and_factory_name(self):
         # user-facing names: td class / cpp class / factory, not only the pass arg
@@ -172,3 +183,70 @@ class EmptyRepoTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class AttributeProvenanceTest(unittest.TestCase):
+    """Phase 15 / RG-1: typed attribute creator provenance (ADR-021)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = os.path.join(FIXTURES, "simple-pass")
+        idx = Indexer(cls.repo)
+        idx.build(full=True)
+        idx.close()
+        cls.svc = QueryService(cls.repo)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.svc.close()
+
+    def _prov(self, name):
+        return self.svc.attribute_provenance(name)
+
+    def test_definition_join_and_dialect(self):
+        r = self._prov("Simple_MagicAttr")
+        self.assertEqual(len(r["definitions"]), 1)
+        d = r["definitions"][0]
+        self.assertEqual(d["node"]["id"], "attr:Simple_MagicAttr")
+        self.assertEqual(d["dialects"][0]["dialect"], "dialect:Simple")
+        self.assertEqual(d["confidence"], "confirmed")
+
+    def test_creator_types(self):
+        r = self._prov("Simple_MagicAttr")
+        types = {c["entity"]["id"]: c["type"] for c in r["creators"]}
+        self.assertEqual(types.get("symbol:SimpleOp"), "OpBuilder")
+        self.assertEqual(types.get("pattern:MagicAnnotatePattern"),
+                         "RewritePattern")
+        self.assertEqual(types.get("pattern:MagicConvertPattern"),
+                         "ConversionPattern")
+        self.assertTrue(any(t == "PipelineBuilder" and
+                            "buildMagicPipeline" in e for e, t in types.items()),
+                        types)
+
+    def test_attach_flag_marks_attachment_sites(self):
+        r = self._prov("Simple_MagicAttr")
+        att = {c["entity"]["id"]: c["attach"] for c in r["creators"]}
+        self.assertTrue(att["symbol:SimpleOp"])          # state.addAttribute
+        self.assertTrue(att["pattern:MagicAnnotatePattern"])  # setAttr
+        self.assertTrue(att["pattern:MagicConvertPattern"])
+
+    def test_verifier_is_consumer_not_creator(self):
+        r = self._prov("Simple_MagicAttr")
+        creator_ids = {c["entity"]["id"] for c in r["creators"]}
+        self.assertNotIn("symbol:SimpleCheckOp", creator_ids)
+        cons = {c["entity"]["id"]: c["role"] for c in r["consumers"]}
+        self.assertEqual(cons.get("symbol:SimpleCheckOp"), "verifier")
+
+    def test_pass_creator_typed(self):
+        r = self._prov("Simple_MagicV2Attr")
+        self.assertTrue(any(c["type"] == "Pass" for c in r["creators"]),
+                        r["creators"])
+        self.assertTrue(all(c["attach"] for c in r["creators"]))
+
+    def test_ambiguous_attribute_query_is_explicit(self):
+        r = self._prov("Simple_Magic")
+        self.assertEqual(r.get("error"), "ambiguous")
+        self.assertEqual(len(r["candidates"]), 2)
+
+    def test_unknown_attribute(self):
+        self.assertEqual(self._prov("Nope_Attr").get("error"), "not found")

@@ -390,6 +390,76 @@ class QueryService:
         creates = self._evidence_summary(self.store.edges_to(aid, model.CREATES_ATTRIBUTE))
         return {"attribute": node, "referenced_by": refs, "created_by": creates}
 
+    def attribute_provenance(self, name):
+        """Typed creator provenance for an IR attribute (Phase 15 / RG-1).
+
+        Deterministic join of: td definition (attr:<Name> + DIALECT_OWNS), typed
+        creators (CREATES_ATTRIBUTE with creator_type), and typed consumers
+        (REFERENCES with role, from containers rather than bare files).
+        Ambiguity is explicit; nothing is guessed.
+        """
+        aid = name if name.startswith("attribute:") else f"attribute:{name}"
+        node = self._node_or_none(aid)
+        if not node:
+            cands = [n for n in self.store.search_nodes(name)
+                     if n["kind"] == model.ATTRIBUTE]
+            if len(cands) == 1:
+                aid, node = cands[0]["id"], cands[0]
+            elif cands:
+                return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
+            else:
+                # definition-only attribute: a td AttrDef exists without IR refs
+                anode = self._node_or_none(f"attr:{name}")
+                if anode:
+                    out = {"attribute": anode, "definitions": [],
+                           "creators": [], "consumers": [],
+                           "referenced_by_files": [],
+                           "diagnostics": ["no IR-level references found "
+                                           "(definition-only attribute)"]}
+                    owners = [{"dialect": e["src"], "evidence": e["evidence"]}
+                              for e in self._evidence_summary(
+                                  self.store.edges_to(anode["id"],
+                                                      model.DIALECT_OWNS))]
+                    out["definitions"].append({"node": anode, "dialects": owners,
+                                               "confidence": "confirmed"})
+                    return out
+                return {"error": "not found"}
+        out = {"attribute": node, "definitions": [], "creators": [],
+               "consumers": [], "referenced_by_files": [], "diagnostics": []}
+        # td definition side: exact-name AttrDef + its owning dialect
+        anode = self._node_or_none(f"attr:{node['name']}")
+        if anode:
+            owners = [{"dialect": e["src"], "evidence": e["evidence"]}
+                      for e in self._evidence_summary(
+                          self.store.edges_to(anode["id"], model.DIALECT_OWNS))]
+            out["definitions"].append({"node": anode, "dialects": owners,
+                                       "confidence": "confirmed"})
+        # creators: typed CREATES_ATTRIBUTE
+        for e in self._evidence_summary(
+                self.store.edges_to(aid, model.CREATES_ATTRIBUTE)):
+            out["creators"].append({
+                "entity": self._node_or_none(e["src"]) or {"id": e["src"]},
+                "type": e["props"].get("creator_type"),
+                "attach": e["props"].get("attach", False),
+                "confidence": e["confidence"], "evidence": e["evidence"]})
+        # consumers: container-level references with a role
+        for e in self.store.edges_to(aid, model.REFERENCES):
+            if e["src"].startswith("file:"):
+                out["referenced_by_files"].append(
+                    {"file": e["src"][len("file:"):], "evidence": e["evidence"]})
+            else:
+                out["consumers"].append({
+                    "entity": self._node_or_none(e["src"]) or {"id": e["src"]},
+                    "role": e["props"].get("role"),
+                    "evidence": e["evidence"]})
+        if not out["definitions"]:
+            out["diagnostics"].append(
+                "no TableGen AttrDef definition found (name-level reference only)")
+        if not out["creators"]:
+            out["diagnostics"].append(
+                "no typed creator found — references are file-level only")
+        return out
+
     def pipeline_composition(self, name):
         """Cross-language construction chain for a pass (Phase 9):
         Python composition function -> binding -> C++ factory -> pass."""

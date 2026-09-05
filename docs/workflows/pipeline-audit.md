@@ -48,7 +48,10 @@ plus guard text replaces repository-wide searching.
    was touched since the resolved commit; findings newly flagged "Needs review" with
    the commit that likely affected them. Output is a risk-delta statement per pass
    ("unchanged / risk reopened / risk resolved / new exposure"), each citing the
-   finding id + commit; the audit never reclassifies a finding's status itself.
+   finding id + commit; the audit never reclassifies a finding's status itself. When
+   a pipeline boundary involves attributes, append the attribute contract block from
+   lens 2 (creator / consumer / risk) using
+   `mlir-repomap attribute-provenance <Name>Attr`.
 
 1x. **Cross-pass optimization flow** — across the whole pipeline, build the
    opportunity ledger: which stage **creates** an optimization opportunity (e.g.
@@ -89,10 +92,21 @@ plus guard text replaces repository-wide searching.
 
 2. **Hidden invariants / cross-pass state (attribute contracts)** — pass options or IR
    markers that one stage writes and another reads. For every annotation/metadata/marker
-   attribute discovered in the stages, run `mlir-repomap attribute <Name>Attr` and record
-   the producer → attribute → consumer chain inside this pipeline; a producer in pipeline A
-   consumed in pipeline B is exactly the cross-pipeline contract this lens exists for.
-   Classify by how they would fail (wrong result vs compile error).
+   attribute discovered in the stages, run
+   `mlir-repomap attribute-provenance <Name>Attr` and record the contract as a block:
+
+   ```
+   attribute contract: <Name>Attr (definition: <td file:line> or "C++-level, no td def")
+   creator:  <typed creator(s): Pass/RewritePattern/ConversionPattern/OpBuilder/
+             PipelineBuilder, with attach site file:line>
+   consumer: <typed consumers (verifier = semantics assumed there) + referencing files>
+   risk:     <what breaks if producer and consumer drift apart — wrong result vs
+             compile error; "unvalidated" when no verifier consumer exists>
+   ```
+
+   A producer in pipeline A consumed in pipeline B is exactly the cross-pipeline
+   contract this lens exists for; a contract whose creator is unattributed is itself
+   a finding (record it in the findings directory per ADR-020).
 3. **Conditional duplication** — the same pass (or pipeline phase like bufferize) running at
    two guarded positions. Check the guards are mutually exclusive and both branches keep
    downstream invariants. Mutual exclusion must be verified from guard text, not assumed.

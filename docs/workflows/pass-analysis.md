@@ -57,11 +57,19 @@ query would have answered it (feeds the query-API review).
 
 5b. **Attribute contract** — if the pass creates, consumes, or is gated by IR attributes
    (annotations, metadata, markers): for each attribute run
-   `mlir-repomap attribute <Name>Attr`. Output the full contract: Producer (confirmed
-   creator) → attribute → Consumers (referencing files/passes) → attachment relation →
-   evidence. If the producer/consumer pair crosses pipelines, state it as a pipeline
-   contract in the dossier. A pass with no attribute hits must record
-   "no attribute contract (graph-confirmed)" rather than leaving the section empty.
+   `mlir-repomap attribute-provenance <Name>Attr` (creator provenance, Phase 15) and
+   `mlir-repomap attribute <Name>Attr` for the full reference set. Output the full
+   contract: **Where does this attribute come from?** (definition — td AttrDef or
+   C++-level, with owning dialect — plus typed creators: OpBuilder build-method,
+   RewritePattern/ConversionPattern, Pass, PipelineBuilder, each with file:line and
+   attach flag) → **Who owns its semantics?** (the dialect/def side plus any verifier
+   consumer — role `verifier` means a checker assumes the semantics) → **Who consumes
+   it?** (typed consumers + referencing files). If the producer/consumer pair crosses
+   pipelines, state it as a pipeline contract in the dossier. A pass with no attribute
+   hits must record "no attribute contract (graph-confirmed)" rather than leaving the
+   section empty; when `attribute-provenance` returns diagnostics (no td definition,
+   no typed creator), report them as-is — unresolved provenance is a fact, not a gap
+   to paper over with guesses.
 6. **Core transformation algorithm** — the actual algorithm at the level a reviewer needs:
    data structures, iteration order, cost heuristics. Cite `file:line` for each claim.
 7. **Output invariant** — what the pass guarantees afterwards; what downstream passes

@@ -10,7 +10,7 @@ import os
 import time
 
 from . import model, repo
-from .extractors import tablegen, cpppass, pipeline, pattern, tests, python
+from .extractors import tablegen, cpppass, pipeline, pattern, tests, python, attribute
 from .store import Store
 
 DEFAULT_EXCLUDES = ["third-party", "third_party", "build", ".git", ".mlir-repomap",
@@ -48,7 +48,7 @@ def _extractors_for(rel):
     if ext == ".td":
         return [tablegen]
     if ext in (".cpp", ".cc", ".h", ".hpp", ".c"):
-        return [cpppass, pipeline, pattern]
+        return [cpppass, pipeline, pattern, attribute]
     if ext == ".mlir":
         return [tests]
     if ext == ".py":

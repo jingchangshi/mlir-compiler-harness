@@ -351,3 +351,41 @@ the "no auto fix judgment" rule); full YAML library (rejected: stdlib-only porta
 Consequences: no INDEXER_VERSION bump (index untouched); a new FindingService joins the
 contract surface; line-granular commit attribution and a baseline convention for
 pre-mechanism findings are recorded gaps.
+
+## ADR-021 (2026-09-05, accepted) — Attribute creator provenance: container-typed creators, mechanism-classified lines
+
+Context: RG-1 — attribute provenance could say where an attribute is *referenced* and
+(weakly) which pass class mentions it, but not who creates it, where it is attached, or
+which verifier assumes its semantics. Phase 14 findings TTL-001/TTA-001 cited this gap
+directly.
+Decision: (1) creator typing is **container classification** over brace-matched spans —
+pattern class with conversion base → ConversionPattern, other rewrite bases →
+RewritePattern, op `build` method → OpBuilder, pass class/method → Pass, OpPassManager
+function building a pipeline → PipelineBuilder, free function taking
+PatternRewriter&/ConversionPatternRewriter& → pattern-side helper (signature rule, same
+principle as the RewritePatternSet& populator rule, ADR-012). (2) **Mechanism is read
+from the reference line**: `XxxAttr::get(` = construction, `setAttr/addAttr/addAttribute`
+= attachment (`attach: true`), `getAttr/removeAttr/hasAttr` or plain mention = read →
+consumer (`role: verifier` for verify methods, else reader). A mention alone never
+creates a creator edge. (3) Verifier is recorded as a *consumer* semantics-dependency,
+not a creator — recording verifiers as creators would be a false fact (goal listed
+Verifier among creator types; only source-provable roles are kept). (4) td definition
+join (`attr:<Name>` + DIALECT_OWNS) happens at query time in the new
+`attribute-provenance` query; definition-only attributes are served from the td side
+with a diagnostic. (5) The old containment-based CREATES_ATTRIBUTE extraction in
+cpppass.py is removed — replaced by typed edges; this deliberately *shrinks* creator
+lists (v43's lists contained false creators such as reads via hasAttr).
+Alternatives rejected: verifier-as-creator (false facts); Python `Pass(..., attr=)`
+kwarg detection (no occurrence in the validation repos — not implemented, recorded);
+per-attribute attribution of dynamic `setAttrs(op->getAttrs())` forwarding
+(name-agnostic, not attributable — TTA-001 limitation, kept honest).
+Evidence: docs/validation/phase15/ — real chains: StrideAlignDimsAttr creator
+pattern:NormalizeAlignInfoPattern (attach, EnableStrideAlign.cpp:98) with consumers
+including the conversion boundary; TreeReductionSelectionFrozenAttr creator pass:vf-fusion
+(attach, VFFusionPass.cpp:168) — the VFFusion↔AutoVectorizeV2 contract; MultiBufferAttr
+creator reduced 3 (v43, 2 false) → 1 true (pattern-helper mark(), MarkMultiBuffer.cpp:238);
+ecosystem contract creators for SyncBlockLockUnorderedAttr / TCoreTypeAttr now typed.
+Consequences: INDEXER_VERSION 45 (full re-index); CREATES_ATTRIBUTE gains creator_type /
+attach props and pattern/function/symbol sources; ecosystem creator lists become
+mechanism-honest; no new node kinds, no findings/reasoning in the graph (ADR-019/020
+separation intact).

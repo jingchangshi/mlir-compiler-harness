@@ -1,20 +1,19 @@
 # Roadmap
 
-done: Phase 0-14 (…, compiler review intelligence layer, knowledge evolution loop:
-finding artifacts + lifecycle + git drift tracking; ADR-001..020). Repos:
-AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer over both.
+done: Phase 0-15 (…, knowledge evolution loop, attribute creator precision; ADR-001..021).
+Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer over both.
 
 current: none.
 
-next (based on Phase 14 evidence):
-1. **RG-1 attribute-creator precision (option A)** — top candidate again: it sharpens
-   finding evidence (creator-side ownership for the ecosystem contracts behind
-   TTL-001/TTA-001) and closes the last provenance gap with an active workflow
-   consumer.
-2. **Finding-resolution assists** (auto-assistable, never auto-status): test-coverage
+next (based on Phase 15 evidence):
+1. **Finding-resolution assists** (auto-assistable, never auto-status): test-coverage
    churn via TEST_COVERS_PASS, constraint re-extraction diff as a drift signal,
-   ecosystem contract validation for TTA-001 (Phase 11 machinery).
-3. **EG-1 remainder / ecosystem persistence** (carried).
+   ecosystem contract validation for TTA-001 — TTA-001's per-attribute chain stays
+   unattributable (dynamic setAttrs forwarding), but the contract inventory check is
+   now machine-runnable.
+2. **EG-1 remainder / ecosystem persistence** (carried).
+3. C++-level attribute definitions (attrs without td AttrDef — StrideAlignDimsAttr
+   family) surfaced only as a diagnostic today.
 
 deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
 
