@@ -85,6 +85,15 @@ remains (`populate*` chasing) and did not block the workflows.
   verifier completeness, annotation name validation, cross-dialect flatten contract);
   workflows 7f + lens 1x; no engine changes.
 
+- Phase 14 knowledge evolution loop (ADR-020, `docs/validation/phase14/`): findings
+  are doc-layer YAML artifacts with a validated lifecycle (open → … → resolved /
+  rejected / superseded; every transition needs reason + evidence) and deterministic
+  git drift tracking (`findings list|check|show`): commits touching evidence files
+  since the baseline + snippet verification ("evidence changed"), report-only — never
+  status-mutating. 7 findings seeded across both repos with regression-memory
+  entries grounded in real commits; workflows gain pass-analysis step 0 (evolution
+  check) + pipeline-audit lens 1e (risk delta); 25/25 tests.
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
@@ -99,8 +108,10 @@ remains (`populate*` chasing) and did not block the workflows.
 - Short pass names may be inherently ambiguous across dialects (engine returns explicit
   ambiguity; agents must ask).
 - No MCP, no agent skills, no clangd (deliberately deferred).
+- Findings: commit attribution is file-granular; `--since` needed when findings lack a
+  recorded baseline; constraint line anchors can be off by one (snippet check tolerates).
 
 ## Next recommended phase
 
-Pattern extraction enhancement (QG-3 populate*-chasing + QG-1 pipeline identity) — see
-roadmap.md and ADR-011.
+Attribute creator precision (RG-1) — see roadmap.md and ADR-020 (§8 of the phase 14
+validation record).

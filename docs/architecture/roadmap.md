@@ -1,19 +1,19 @@
 # Roadmap
 
-done: Phase 0-13 (…, intent & optimization reasoning, compiler review intelligence
-layer; ADR-001..019). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem
-layer over both.
+done: Phase 0-14 (…, compiler review intelligence layer, knowledge evolution loop:
+finding artifacts + lifecycle + git drift tracking; ADR-001..020). Repos:
+AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer over both.
 
 current: none.
 
-next (based on Phase 13 evidence):
-1. **RG-1 attribute-creator tracing** (unchanged top candidate) — now also strengthens
-   review records (creator-side ownership for the 5 ecosystem contracts).
-2. **Unguarded-invariant watchlist**: the four Phase 13 findings are concrete
-   engineering leads for the TARGET repos (merge-vf call-site guard, AV2 verifier
-   inventory, annotation name validation, flatten axis-identity contract) — deliverable
-   as issues/reports to the respective teams, which also validates the harness's
-   practical value.
+next (based on Phase 14 evidence):
+1. **RG-1 attribute-creator precision (option A)** — top candidate again: it sharpens
+   finding evidence (creator-side ownership for the ecosystem contracts behind
+   TTL-001/TTA-001) and closes the last provenance gap with an active workflow
+   consumer.
+2. **Finding-resolution assists** (auto-assistable, never auto-status): test-coverage
+   churn via TEST_COVERS_PASS, constraint re-extraction diff as a drift signal,
+   ecosystem contract validation for TTA-001 (Phase 11 machinery).
 3. **EG-1 remainder / ecosystem persistence** (carried).
 
 deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.

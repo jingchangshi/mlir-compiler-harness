@@ -39,6 +39,17 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1e. **Evolution lens** — *which architectural risks changed over time?* Run
+   `mlir-repomap findings list` and `mlir-repomap findings check` over the pipeline's
+   passes (findings directory of the audited repo; use `--since` with the last audit
+   point when baselines are missing), and join with `mlir-repomap changed` for the
+   pipeline's builder/pass files. For each pipeline pass report: historical findings
+   and their current lifecycle status; regression-memory entries whose guarded area
+   was touched since the resolved commit; findings newly flagged "Needs review" with
+   the commit that likely affected them. Output is a risk-delta statement per pass
+   ("unchanged / risk reopened / risk resolved / new exposure"), each citing the
+   finding id + commit; the audit never reclassifies a finding's status itself.
+
 1x. **Cross-pass optimization flow** — across the whole pipeline, build the
    opportunity ledger: which stage **creates** an optimization opportunity (e.g.
    normalization/fusion enabling vectorization), which stage **blocks** one (a guard

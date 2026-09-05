@@ -1,0 +1,40 @@
+# Compiler finding — doc-layer artifact (not a graph entity; ADR-020).
+finding:
+  id: TTA-001
+  category: correctness
+  pass: triton-to-annotation
+  statement: >-
+    Forwarded annotation attribute names are not validated against the consumer
+    repo's attribute-contract inventory: unknown names pass through silently
+    (setAttrs is verbatim), so contract drift between the two repositories is
+    only detectable downstream or by agent-run ecosystem queries.
+  evidence:
+    - file: third_party/ascend/lib/TritonToAnnotation/TritonToAnnotation.cpp
+      lines: 55
+      kind: code
+      snippet: "markOp->setAttrs(op->getAttrs());"
+    - file: third_party/ascend/lib/TritonToAnnotation/TritonToAnnotation.cpp
+      lines: 68-69
+      kind: constraint
+      ref: constraint:third_party/ascend/lib/TritonToAnnotation/TritonToAnnotation.cpp:69
+      snippet: "if (failed(applyPartialConversion(module, target, std::move(patterns)))) {"
+  reasoning: >-
+    Agent reasoning (layer 2): the pass's only guard protects conversion success,
+    not contract conformance. The Phase 11 ecosystem layer already derives the
+    consumer-side attribute inventory (5 cross-repo attribute contracts); a
+    validation step comparing forwarded names against that inventory would turn
+    silent drift into an early signal. Forward compatibility (why nothing
+    validates today) is a deliberate tradeoff — the finding asks for detection,
+    not rejection.
+  status: open
+  created_at: 2026-09-05
+  created_by: phase13-review
+  source: docs/compiler-architecture/triton-ascend/passes/triton-to-annotation.md#compiler-review-phase-13
+  history:
+    - status: open
+      at: 2026-09-05
+      by: phase14-evolution-loop
+      reason: recorded as durable finding when the evolution loop landed
+      reference: docs/compiler-architecture/triton-ascend/passes/triton-to-annotation.md
+  review:
+    baseline_commit: 8ba4ac4ce5676f7f7c25725ae5b2dddb5781f466

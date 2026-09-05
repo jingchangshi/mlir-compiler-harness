@@ -1,0 +1,43 @@
+# Compiler finding — doc-layer artifact (not a graph entity; ADR-020).
+# Lives in the harness repo (established in Phase 8: triton-ascend architecture
+# docs are harness-side); git drift tracking runs against the triton-ascend repo.
+finding:
+  id: TTL-001
+  category: correctness
+  pass: triton-to-linalg
+  statement: >-
+    The flatten-before-storage-align cross-dialect contract is unguarded: the
+    baseline repo's storage alignment (MarkStrideAlign) treats memref shapes as
+    already flattened ("directly treats the Op as already having undergone the
+    axis merging operation"), while the Triton path's lowering collapses shapes
+    to 1-D without a verifier that the two sides agree.
+  evidence:
+    - file: bishengir/lib/Dialect/HIVM/Transforms/AlignBuffer/MarkStrideAlign.cpp
+      lines: 932-935
+      kind: code-comment
+      repo: AscendNPU-IR
+      snippet: "directly treats the Op as already having"
+    - file: third_party/ascend/lib/TritonToLinalg/TritonToLinalgPass.cpp
+      lines: 742-745
+      kind: code-comment
+      snippet: "collapses to a 1-D scan"
+  reasoning: >-
+    Agent reasoning (layer 2): this is an ecosystem contract, not a single-repo
+    invariant — the consumer-side assumption (AscendNPU-IR comment) and the
+    producer-side shape collapse (triton-ascend) live in different repositories
+    and no verifier spans them. The harness ecosystem layer (ADR-017) is the
+    natural home for a handoff-contract check. Per-axis semantics are lost at
+    flatten (reassociation pairs only); retaining axis-identity metadata through
+    flatten is the recorded opportunity.
+  status: open
+  created_at: 2026-09-05
+  created_by: phase13-review
+  source: docs/compiler-architecture/triton-ascend/passes/triton-to-linalg.md#compiler-review-phase-13
+  history:
+    - status: open
+      at: 2026-09-05
+      by: phase14-evolution-loop
+      reason: recorded as durable finding when the evolution loop landed
+      reference: docs/compiler-architecture/triton-ascend/passes/triton-to-linalg.md
+  review:
+    baseline_commit: 8ba4ac4ce5676f7f7c25725ae5b2dddb5781f466

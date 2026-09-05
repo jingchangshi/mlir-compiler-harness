@@ -324,3 +324,30 @@ completeness, triton-to-annotation name validation, triton-to-linalg cross-diale
 flatten contract).
 Consequences: reasoning provenance is visible by layer; the graph remains a facts-only
 contract; RG-1 stays backlog (ownership resolvable by reasoning).
+
+## ADR-020 (2026-09-05, accepted) — Compiler findings: doc-layer lifecycle artifacts + deterministic git drift tracking
+
+Context: Phase 13 review records are one-shot dossier sections; compiler findings
+(unguarded invariants, opportunities, historical concerns) had no durable lifecycle and
+no mechanism to notice when their evidence changed under them.
+Decision: (1) findings are **doc-layer YAML artifacts** (`<ID>.yaml`, one per file) in the
+target repo's `docs/compiler-architecture/findings/` — never graph entities; the graph
+stays facts-only. (2) The engine provides only deterministic services over them:
+strict-subset parsing with fail-soft diagnostics, schema/lifecycle validation
+(every status transition requires reason + evidence/reference; superseded requires
+superseded_by), and git-aware drift detection (commits touching evidence files since
+`review.baseline_commit`, snippet-presence verification reporting "evidence changed").
+(3) The engine **never mutates status and never judges a fix** — `findings check`
+outputs "possibly affected by commit X / Needs review" in the goal format; lifecycle
+advancement is an agent/human edit with recorded reasoning. (4) Workflows consume it:
+pass-analysis step 0 (evolution check) and pipeline-audit lens 1e (risk delta).
+Evidence: docs/validation/phase14/ — 7 seeded findings across both repos (5 AscendNPU-IR,
+2 triton-ascend, one with dual-repo evidence), real-history drills flagging the exact
+commits recorded in regression memory (fa682a1a3, 7875b76ea), a clean true-negative
+(TTA-001), 25/25 tests.
+Alternatives: findings as graph nodes (rejected: agent reasoning disguised as facts);
+automatic status resolution from git (rejected: violates the three-layer separation and
+the "no auto fix judgment" rule); full YAML library (rejected: stdlib-only portability).
+Consequences: no INDEXER_VERSION bump (index untouched); a new FindingService joins the
+contract surface; line-granular commit attribution and a baseline convention for
+pre-mechanism findings are recorded gaps.

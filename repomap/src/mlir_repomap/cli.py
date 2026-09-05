@@ -5,6 +5,23 @@ import os
 import sys
 
 
+def _findings_text(result):
+    lines = []
+    for r in result["results"]:
+        lines.append(f"Finding {r.get('id')}")
+        if not r.get("checked"):
+            lines.append(f"not checked: {r.get('reason')}")
+        elif r.get("needs_review"):
+            lines.append(r["verdict"])
+            lines.append("Needs review")
+        else:
+            lines.append(r["verdict"])
+    s = result["summary"]
+    lines.append(f"{s['findings']} findings: {s['needs_review']} need review, "
+                 f"{s['clean']} clean, {s['unchecked']} unchecked")
+    return "\n".join(lines)
+
+
 def main(argv=None):
     from . import index as index_mod
     from .query import QueryService
@@ -40,9 +57,40 @@ def main(argv=None):
     p = sub.add_parser("pass-intent"); p.add_argument("name")
     p = sub.add_parser("pass-constraints"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
+    fin = sub.add_parser("findings")
+    fsub = fin.add_subparsers(dest="fsub", required=True)
+    fl = fsub.add_parser("list")
+    fl.add_argument("--status"); fl.add_argument("--pass-name")
+    fl.add_argument("--category"); fl.add_argument("--dir")
+    fl.add_argument("--has-regression", action="store_true")
+    fc = fsub.add_parser("check")
+    fc.add_argument("--since"); fc.add_argument("--dir"); fc.add_argument("--git-repo")
+    fc.add_argument("--format", choices=["json", "text"], default="json")
+    fs = fsub.add_parser("show"); fs.add_argument("fid"); fs.add_argument("--dir")
 
     args = ap.parse_args(argv)
     root = args.repo
+
+    if args.cmd == "findings":
+        from .findings import FindingService
+        fdir = args.dir or os.path.join(root, "docs", "compiler-architecture",
+                                        "findings")
+        git_repo = getattr(args, "git_repo", None) or root
+        svc = FindingService(fdir, repo=git_repo)
+        if args.fsub == "list":
+            result = svc.list(status=args.status, pass_name=args.pass_name,
+                              category=args.category,
+                              has_regression=bool(args.has_regression) or None)
+        elif args.fsub == "check":
+            result = svc.check(since=args.since)
+            if args.format == "text":
+                print(_findings_text(result))
+                return 0
+        else:
+            result = svc.show(args.fid)
+        print(json.dumps({"command": "findings", "result": result},
+                         indent=1, default=str))
+        return 0
 
     if args.cmd == "ecosystem":
         from .ecosystem import EcosystemQueryService
