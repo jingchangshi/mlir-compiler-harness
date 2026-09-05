@@ -73,3 +73,13 @@ std::unique_ptr<Pass> createSimpleFoldPass() { return std::make_unique<SimpleFol
 // touch
 
 // touch
+
+// touch
+
+// touch
+// out-of-line runOnOperation now delegates to the populator
+void SimpleFoldPass::runOnOperation() {
+  RewritePatternSet patterns(&getContext());
+  populateSimpleFoldPatterns(patterns);
+  applyPatternsGreedily(getOperation(), std::move(patterns));
+}

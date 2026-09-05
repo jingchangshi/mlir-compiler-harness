@@ -80,6 +80,29 @@ def extract(relpath, text):
                       "kind": model.REFERENCES, "props": {"via": "PassRegistration"},
                       "evidence": ev(ln)})
 
+    # IR attribute name references (QG-4): `XxxAttr::name` -> attribute entity
+    RE_ATTR_NAME = re.compile(r'\b(\w+Attr)::name')
+    attr_hits = {}
+    for m in RE_ATTR_NAME.finditer(text):
+        nm = m.group(1)
+        ln = line_of(m.start())
+        attr_hits.setdefault(nm, ln)
+        nodes.append({"id": f"attribute:{nm}", "kind": model.ATTRIBUTE, "name": nm,
+                      "summary": "", "file": relpath, "line": ln})
+        edges.append({"src": f"file:{relpath}", "dst": f"attribute:{nm}",
+                      "kind": model.REFERENCES, "props": {"via": "Attr::name"},
+                      "evidence": ev(ln)})
+    # attribute created inside a pass class body -> CREATES_ATTRIBUTE (inferred)
+    for m in RE_PASS_CLASS.finditer(text):
+        cls = m.group(1)
+        ln = line_of(m.start())
+        body = "\n".join(lines[ln - 1: ln + 199])
+        for nm in attr_hits:
+            if nm in body:
+                edges.append({"src": f"pass_class:{cls}", "dst": f"attribute:{nm}",
+                              "kind": model.CREATES_ATTRIBUTE, "props": {},
+                              "evidence": ev(ln)})
+
     # analysis classes (name-level only, MVP limitation)
     for m in RE_ANALYSIS.finditer(text):
         name = m.group(1)

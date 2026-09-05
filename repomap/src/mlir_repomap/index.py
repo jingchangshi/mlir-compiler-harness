@@ -258,14 +258,30 @@ class Indexer:
                             "FROM edges WHERE src=? AND dst=? AND kind='DIALECT_OWNS'",
                             (file, 1, 1, "", "inferred", owner, nid))
 
-        # rewrite PASS_USES_PATTERN from pass_class:* to the owning pass when known
-        for eid, src in db.execute(
-                "SELECT edge_id, src FROM edges WHERE kind='PASS_USES_PATTERN' "
-                "AND src LIKE 'pass_class:%'").fetchall():
-            cls = src.split(":", 1)[-1]
-            if cls in class_to_pass:
-                db.execute("UPDATE edges SET src=? WHERE edge_id=?",
-                           (class_to_pass[cls], eid))
+        # rewrite pass_class:* sources to the owning pass (pattern + populator edges)
+        for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR"):
+            for eid, src in db.execute(
+                    f"SELECT edge_id, src FROM edges WHERE kind='{kind}' "
+                    "AND src LIKE 'pass_class:%'").fetchall():
+                cls = src.split(":", 1)[-1]
+                if cls in class_to_pass:
+                    db.execute("UPDATE edges SET src=? WHERE edge_id=?",
+                               (class_to_pass[cls], eid))
+        # resolve name-based pipeline call markers to file-qualified pipeline ids (QG-1)
+        pipe_names = {}
+        for pid, nm in db.execute("SELECT id, name FROM nodes WHERE kind='pipeline'"):
+            pipe_names.setdefault(nm, []).append(pid)
+        for eid, dst in db.execute(
+                "SELECT edge_id, dst FROM edges WHERE kind='PIPELINE_CALLS' "
+                "AND dst LIKE 'pipeline:NAME:%'").fetchall():
+            nm = dst.split("pipeline:NAME:", 1)[-1]
+            ids = pipe_names.get(nm, [])
+            if len(ids) == 1:
+                db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (ids[0], eid))
+            elif len(ids) > 1:
+                db.execute(
+                    "UPDATE edges SET props=json_set(props,'$.ambiguous_name',?) "
+                    "WHERE edge_id=?", (nm, eid))
 
         # test edges: keep only those hitting known passes; reroute pipeline flags
         pass_names = set(r[0] for r in db.execute("SELECT id FROM nodes WHERE kind='pass'"))

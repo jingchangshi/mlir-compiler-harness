@@ -149,13 +149,45 @@ class QueryService:
             se = self.store.edges_to(nid, model.PRECEDES)
             m["predecessor"] = [e["src"] for e in se if same_ctx(e["props"])]
         patterns = []
+        seen_patterns = set()
         for e in self.store.edges_from(nid, model.PASS_USES_PATTERN):
             pat = e["dst"]
+            seen_patterns.add(pat)
             p = self._node_or_none(pat) or {"id": pat}
             matches = [x["dst"] for x in self.store.edges_from(pat, model.PATTERN_MATCHES_OP)]
             creates = [x["dst"] for x in self.store.edges_from(pat, model.PATTERN_CREATES_OP)]
             patterns.append({"pattern": pat, "node": p, "matches_ops": matches,
                              "creates_ops": creates, "evidence": e["evidence"]})
+        # provenance chain (ADR-012): pass -> populator function -> patterns
+        for e in self._evidence_summary(
+                self.store.edges_from(nid, model.PASS_USES_PATTERN_POPULATOR)):
+            fid = e["dst"]
+            fn = self._node_or_none(fid) or {"id": fid}
+            pats = [x["dst"] for x in self.store.edges_from(fid, model.FUNCTION_DEFINES_PATTERN)
+                    if x["dst"] not in seen_patterns]
+            seen_patterns.update(pats)
+            pat_detail = []
+            for pat in pats:
+                pat_detail.append({
+                    "pattern": pat,
+                    "matches_ops": [x["dst"] for x in self.store.edges_from(
+                        pat, model.PATTERN_MATCHES_OP)],
+                    "creates_ops": [x["dst"] for x in self.store.edges_from(
+                        pat, model.PATTERN_CREATES_OP)]})
+            patterns.append({"populator": fid, "node": fn, "confidence": e["confidence"],
+                             "evidence": e["evidence"], "patterns": pat_detail})
+            # nested populator calls (populateFusionPatterns -> populateMatmulPatterns)
+            for ce in self.store.edges_from(fid, model.FUNCTION_CALLS):
+                sub = self._node_or_none(ce["dst"]) or {"id": ce["dst"]}
+                sub_pats = [x["dst"] for x in self.store.edges_from(
+                    ce["dst"], model.FUNCTION_DEFINES_PATTERN)]
+                seen_patterns.update(sub_pats)
+                patterns.append({"populator": ce["dst"], "node": sub, "confidence": "inferred",
+                                 "evidence": ce["evidence"],
+                                 "patterns": [{"pattern": pt,
+                                               "matches_ops": [x["dst"] for x in
+                                                               self.store.edges_from(pt, model.PATTERN_MATCHES_OP)],
+                                               "creates_ops": []} for pt in sub_pats]})
         factories = [e["dst"] for e in self.store.edges_from(nid, model.PASS_HAS_FACTORY)]
         impl = [e["dst"] for e in self.store.edges_from(nid, model.PASS_IMPLEMENTS)]
         tests = self.get_tests(node["name"]).get("tests", [])
@@ -176,19 +208,30 @@ class QueryService:
         return {"pipelines": out}
 
     def get_pipeline(self, name, brief=False):
-        nid = name if name.startswith("pipeline:") else f"pipeline:{name}"
-        node = self._node_or_none(nid)
-        if not node:
-            cands = [n for n in self.store.search_nodes(name) if n["kind"] == model.PIPELINE]
-            if len(cands) == 1:
-                nid, node = cands[0]["id"], cands[0]
-            elif cands:
-                return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
+        node = None
+        if name.startswith("pipeline:"):
+            node = self._node_or_none(name)
+            nid = name
+        else:
+            exact = [p for p in self.store.nodes_by_kind(model.PIPELINE)
+                     if p["name"] == name]
+            if len(exact) == 1:
+                nid, node = exact[0]["id"], exact[0]
+            elif exact:
+                return {"error": "ambiguous", "candidates": [p["id"] for p in exact]}
             else:
-                return {"error": "not found"}
+                cands = [n for n in self.store.search_nodes(name)
+                         if n["kind"] == model.PIPELINE]
+                if len(cands) == 1:
+                    nid, node = cands[0]["id"], cands[0]
+                elif cands:
+                    return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
+                else:
+                    return {"error": "not found"}
         stages = []
         for e in self._evidence_summary(self.store.edges_from(nid, model.PIPELINE_CONTAINS)):
             stage = {"pass": e["dst"], "order": e["props"].get("order"),
+                     "seq": e["props"].get("seq"),
                      "scope": e["props"].get("scope"),
                      "nested": e["props"].get("nested", False),
                      "condition": e["props"].get("condition"),
@@ -196,7 +239,8 @@ class QueryService:
             if not brief:
                 stage["evidence"] = e["evidence"]
             stages.append(stage)
-        stages.sort(key=lambda s: (s["scope"] or "", s["order"] or 0))
+        stages.sort(key=lambda s: (s.get("seq") if s.get("seq") is not None
+                                   else s["order"] or 0,))
         subs = [e["dst"] for e in self.store.edges_from(nid, model.PIPELINE_CALLS)]
         callers = [e["src"] for e in self.store.edges_to(nid, model.PIPELINE_CALLS)]
         tests = self.get_tests(node["name"]).get("tests", [])
@@ -259,6 +303,61 @@ class QueryService:
                     impacted.update(er)
         return {"index": self._index_info(), "changed_files": sorted(set(changed)),
                 "dirty_detail": dirty, "impacted_entities": sorted(impacted)[:200]}
+
+    def pattern_owner(self, name):
+        """Provenance chain: pattern -> defining populator function(s) -> pass(es)."""
+        pat = name if name.startswith("pattern:") else f"pattern:{name}"
+        node = self._node_or_none(pat)
+        if not node:
+            cands = [n for n in self.store.search_nodes(name) if n["kind"] == model.PATTERN]
+            if len(cands) == 1:
+                pat, node = cands[0]["id"], cands[0]
+            elif cands:
+                return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
+            else:
+                return {"error": "not found"}
+        owners = []
+        for e in self._evidence_summary(
+                self.store.edges_to(pat, model.FUNCTION_DEFINES_PATTERN)):
+            fid = e["src"]
+            fn = self._node_or_none(fid) or {"id": fid}
+            passes = [x["src"] for x in self.store.edges_to(fid, model.PASS_USES_PATTERN_POPULATOR)]
+            callers = [x["src"] for x in self.store.edges_to(fid, model.FUNCTION_CALLS)]
+            owners.append({"function": fid, "node": fn, "evidence": e["evidence"],
+                           "passes": passes, "called_by": callers})
+        direct = self._evidence_summary(self.store.edges_to(pat, model.PASS_USES_PATTERN))
+        return {"pattern": node, "populators": owners,
+                "direct_uses": [{"src": e["src"], "evidence": e["evidence"]}
+                                for e in direct]}
+
+    def pipeline_builder(self, name):
+        """Builder function(s) of a pipeline (file-qualified identity, QG-1)."""
+        r = self.get_pipeline(name, brief=True)
+        if "error" in r:
+            return r
+        pid = r["pipeline"]["id"]
+        builders = self._evidence_summary(
+            self.store.edges_from(pid, model.PIPELINE_BUILT_BY))
+        subs = self._evidence_summary(self.store.edges_from(pid, model.PIPELINE_CALLS))
+        callers = self._evidence_summary(self.store.edges_to(pid, model.PIPELINE_CALLS))
+        return {"pipeline": r["pipeline"], "builders": builders,
+                "calls": subs, "called_by": callers}
+
+    def get_attribute(self, name):
+        """Attribute provenance: who references/creates an IR attribute."""
+        aid = name if name.startswith("attribute:") else f"attribute:{name}"
+        node = self._node_or_none(aid)
+        if not node:
+            cands = [n for n in self.store.search_nodes(name) if n["kind"] == model.ATTRIBUTE]
+            if len(cands) == 1:
+                aid, node = cands[0]["id"], cands[0]
+            elif cands:
+                return {"error": "ambiguous", "candidates": [c["id"] for c in cands]}
+            else:
+                return {"error": "not found"}
+        refs = self._evidence_summary(self.store.edges_to(aid, model.REFERENCES))
+        creates = self._evidence_summary(self.store.edges_to(aid, model.CREATES_ATTRIBUTE))
+        return {"attribute": node, "referenced_by": refs, "created_by": creates}
 
     def get_evidence(self, ident):
         if ident.startswith("file:"):

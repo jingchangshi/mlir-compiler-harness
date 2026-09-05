@@ -25,6 +25,9 @@ def main(argv=None):
     p = sub.add_parser("tests"); p.add_argument("name")
     p = sub.add_parser("changed"); p.add_argument("base", nargs="?")
     p = sub.add_parser("evidence"); p.add_argument("ident")
+    p = sub.add_parser("pattern-owner"); p.add_argument("name")
+    p = sub.add_parser("pipeline-builder"); p.add_argument("name")
+    p = sub.add_parser("attribute"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
 
     args = ap.parse_args(argv)
@@ -49,7 +52,10 @@ def main(argv=None):
               "references": lambda: svc.get_references(args.name),
               "tests": lambda: svc.get_tests(args.name),
               "changed": lambda: svc.get_changes(args.base),
-              "evidence": lambda: svc.get_evidence(args.ident)}[args.cmd]
+              "evidence": lambda: svc.get_evidence(args.ident),
+              "pattern-owner": lambda: svc.pattern_owner(args.name),
+              "pipeline-builder": lambda: svc.pipeline_builder(args.name),
+              "attribute": lambda: svc.get_attribute(args.name)}[args.cmd]
         result = fn()
     finally:
         svc.close()

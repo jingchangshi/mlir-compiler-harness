@@ -12,8 +12,23 @@ def extract(relpath, text):
     if not runs:
         return {"nodes": [], "edges": [], "diagnostics": []}
     nid = f"test:{relpath}"
+    # coarse feature tags from filename + RUN lines + IR content (QG-5, heuristic)
+    feats = set()
+    hay = (relpath + " " + text).lower()
+    for tag, needles in {
+        "dynamic-shape": ("?", "dynamic"),
+        "reduction": ("reduce", "sum(", "max(", "min("),
+        "fusion": ("fused", "fusion", "merge"),
+        "vectorization": ("vector<", "vector.transfer", "vectorize"),
+        "bufferization": ("bufferize", "memref.alloc", "bufferization"),
+        "stride-align": ("stride_align", "stride-align"),
+        "nested-region": ("scf.for", "scf.if", "scf.while"),
+    }.items():
+        if any(n in hay for n in needles):
+            feats.add(tag)
     node = {"id": nid, "kind": model.TEST, "name": relpath.rsplit("/", 1)[-1],
-            "summary": "", "file": relpath, "line": 1}
+            "summary": "", "file": relpath, "line": 1,
+            "features": sorted(feats)}
     edges = []
     all_runs = "\n".join(runs)
     # pass-ish flags: -foo-bar or --foo-bar in RUN lines

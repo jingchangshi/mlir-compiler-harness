@@ -84,9 +84,18 @@ def extract(relpath, text):
             pass
 
     for fname, cls, ob, cb in functions:
-        pid = f"pipeline:{fname}"
+        # ADR-012: pipeline identity is (file, function), not the bare name --
+        # same-name builders in different files must not merge (QG-1).
+        pid = f"pipeline:{relpath}:{fname}"
         nodes.append({"id": pid, "kind": model.PIPELINE, "name": fname, "summary": "",
                       "file": relpath, "line": text[:ob].count("\n") + 1})
+        # builder function entity with namespace qualifier
+        fid = f"function:{relpath}:{fname}"
+        nodes.append({"id": fid, "kind": model.FUNCTION, "name": fname,
+                      "summary": "pipeline builder" + (f" ({cls}::)" if cls else ""),
+                      "file": relpath, "line": text[:ob].count("\n") + 1})
+        edges.append({"src": pid, "dst": fid, "kind": model.PIPELINE_BUILT_BY,
+                      "props": {}, "evidence": ev(ob, ob + 1)})
         body = text[ob:cb + 1]
         base = ob
 
@@ -156,13 +165,15 @@ def extract(relpath, text):
                 kind = "macro"
             return cond, kind
 
-        # order counter per scope
+        # order counter per scope; seq = monotonic source order across scopes (QG-6)
         scope_orders = {}
+        seq_counter = 0
         scope_stack = ["module"]
         # walk addPass occurrences in order
         last_pass_by_scope = {}
         for m in RE_ADDPASS.finditer(body):
             off = m.start()
+            seq_counter += 1
             mgr, method, arg = m.group(1), m.group(2), m.group(3)
             # nesting: manager var may be a nest<> chain result captured earlier; also inline
             # pm.nest<Op>().addPass(...) — detect nest in preceding 80 chars
@@ -186,7 +197,8 @@ def extract(relpath, text):
             key = scope if method == "addPass" else f"{scope}:nested"
             scope_orders[key] = scope_orders.get(key, 0) + 1
             cond, ckind = cond_at(off)
-            props = {"order": scope_orders[key], "scope": scope, "nested": method == "addNestedPass"}
+            props = {"order": scope_orders[key], "seq": seq_counter, "scope": scope,
+                     "nested": method == "addNestedPass"}
             if cond:
                 props["condition"] = cond
                 props["condition_kind"] = ckind
@@ -195,7 +207,7 @@ def extract(relpath, text):
             prev = last_pass_by_scope.get(key)
             if prev:
                 edges.append({"src": prev, "dst": dst, "kind": model.PRECEDES,
-                              "props": {"pipeline": fname, "scope": key},
+                              "props": {"pipeline": pid, "scope": key},
                               "evidence": ev(base + off, base + m.end(), model.CONFIRMED)})
             last_pass_by_scope[key] = dst
 
@@ -207,7 +219,7 @@ def extract(relpath, text):
             # only treat as sub-pipeline if name looks like a builder and another
             # function with this name exists (resolver dedups); emit with confidence
             if callee.startswith(("build", "run")):
-                edges.append({"src": pid, "dst": f"pipeline:{callee}",
+                edges.append({"src": pid, "dst": f"pipeline:NAME:{callee}",
                               "kind": model.PIPELINE_CALLS, "props": {},
                               "evidence": ev(base + m.start(), base + m.end(),
                                              model.INFERRED)})

@@ -7,7 +7,14 @@ RE_PATTERN_CLASS = re.compile(
     r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\bpublic\s+'
     r'(OpRewritePattern|OpConversionPattern|OpInterfaceConversionPattern|'
     r'OpInterfaceRewritePattern|RewritePattern|OpTraitRewritePattern)\s*<\s*([\w:]*)')
-RE_PATTERNS_ADD = re.compile(r'patterns\.add\s*<\s*([\w:\s,]+?)\s*>\s*\(')
+RE_PATTERNS_ADD = re.compile(r'patterns\.add\s*<\s*([\w:\s,<>&]+?)\s*>\s*\(')
+# MLIR convention: a pattern-population function takes RewritePatternSet& (name-agnostic;
+# `populate*` prefix recorded as a property, not used for identification)
+RE_POPULATOR_DEF = re.compile(
+    r'\b(?:static\s+)?(?:[\w:<>,\s*&*]+?)\s+(?:[\w:]+::)?'
+    r'(populate\w*|\w*[Pp]attern\w*)\s*\('
+    r'([^;{]*RewritePatternSet\s*&[^;{]*)\)\s*(?:const\s*)?\{')
+RE_POPULATOR_CALL = re.compile(r'\b(populate\w*|\w*[Pp]attern\w*)\s*\(')
 RE_CREATE_OP = re.compile(r'(?:rewriter|builder|b)\.create\s*<\s*([\w:]+)\s*>')
 RE_CONV_ADD = re.compile(r'addConversion\(')
 
@@ -20,6 +27,23 @@ def _method_bodies(text):
     """Out-of-line member function definitions -> (class_name, start, end)."""
     out = []
     for m in RE_OUTOFLINE_METHOD.finditer(text):
+        depth = 0
+        start = m.end() - 1
+        for i in range(start, len(text)):
+            if text[i] == '{':
+                depth += 1
+            elif text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    out.append((m.group(1), start, i))
+                    break
+    return out
+
+
+def _function_bodies(text, regex):
+    """Free-function definitions -> (name, start, end)."""
+    out = []
+    for m in regex.finditer(text):
         depth = 0
         start = m.end() - 1
         for i in range(start, len(text)):
@@ -54,6 +78,17 @@ def extract(relpath, text):
     nodes, edges = [], []
     bodies = _class_bodies(text) + [(n, None, s, e) for n, s, e in _method_bodies(text)]
     name_to_span = {n: (s, e) for n, m, s, e in _class_bodies(text)}
+    # pattern-population functions (QG-3): identified by RewritePatternSet& param
+    populator_spans = _function_bodies(text, RE_POPULATOR_DEF)
+    populator_defs = {}  # name -> (fid, file, line, is_populate_prefix)
+    for n, s, e in populator_spans:
+        fid = f"function:{relpath}:{n}"
+        populator_defs[n] = (fid, s)
+        nodes.append({"id": fid, "kind": model.FUNCTION, "name": n,
+                      "summary": "pattern population function", "file": relpath,
+                      "line": text[:s].count("\n") + 1})
+    # container bodies include populators themselves so patterns.add inside them links here
+    bodies += [(n, None, s, e) for n, s, e in populator_spans]
 
     def ev(start, end, conf=model.CONFIRMED):
         ls = text[:start].count("\n") + 1
@@ -89,19 +124,52 @@ def extract(relpath, text):
         for n, mm, s, e in bodies:
             if s <= off <= e:
                 container = n  # last match wins = innermost (bodies not nested-sorted; approximate)
-        names = [x.strip().split("::")[-1] for x in m.group(1).split(",") if x.strip()]
+        names = [re.match(r'[\w:]+', x.strip().split("::")[-1]).group(0)
+                 for x in m.group(1).split(",") if re.match(r'[\w:]', x.strip())]
         for n in names:
             src = None
+            kind = model.PASS_USES_PATTERN
             if container and (container in name_to_span):
                 if any(p["id"].split(":")[-1] == container for p in nodes
                        if p["id"].startswith("pattern:")):
                     src = f"pattern:{container}"
                 else:
                     src = f"pass_class:{container}"
+            if src is None and container in populator_defs:
+                # patterns.add inside a populator function (QG-3 provenance chain)
+                src, kind = populator_defs[container][0], model.FUNCTION_DEFINES_PATTERN
             if src is None:
                 continue
-            edges.append({"src": src, "dst": f"pattern:{n}",
-                          "kind": model.PASS_USES_PATTERN, "props": {},
+            edges.append({"src": src, "dst": f"pattern:{n}", "kind": kind,
+                          "props": {"template_arg": "<" in m.group(1)},
                           "evidence": ev(off, m.end())})
+
+    # call sites: container (pass class / method / pipeline builder / other function)
+    # calls a populator -> PASS_USES_PATTERN_POPULATOR / FUNCTION_CALLS
+    for m in RE_POPULATOR_CALL.finditer(text):
+        callee = m.group(1)
+        if callee not in populator_defs:
+            continue
+        off = m.start()
+        if populator_defs[callee][1] <= off <= [e for n, s, e in populator_spans if n == callee][0]:
+            continue  # its own definition
+        container = None
+        for n, mm, s, e in bodies:
+            if s <= off <= e:
+                container = n
+        if container is None or container == callee:
+            continue
+        fid = populator_defs[callee][0]
+        if container in name_to_span:
+            src = (f"pattern:{container}" if any(p["id"].split(":")[-1] == container
+                    for p in nodes if p["id"].startswith("pattern:"))
+                   else f"pass_class:{container}")
+            kind = model.PASS_USES_PATTERN_POPULATOR
+        else:
+            # free function container: link function->function
+            src = f"function:{relpath}:{container}"
+            kind = model.FUNCTION_CALLS
+        edges.append({"src": src, "dst": fid, "kind": kind, "props": {},
+                      "evidence": ev(off, m.end())})
 
     return {"nodes": nodes, "edges": edges, "diagnostics": []}
