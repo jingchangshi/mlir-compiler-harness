@@ -1,7 +1,7 @@
 """Entity/edge/evidence model and schema constants for the MLIR RepoMap engine."""
 
 SCHEMA_VERSION = 1
-INDEXER_VERSION = 3
+INDEXER_VERSION = 9
 
 CONFIRMED = "confirmed"
 INFERRED = "inferred"

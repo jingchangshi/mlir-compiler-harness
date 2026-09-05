@@ -46,12 +46,18 @@ class QueryService:
         return {"index": self._index_info(), "entity_counts": counts,
                 "diagnostics": diags, "last_build_stats": meta.get("stats")}
 
-    def modules(self):
+    def modules(self, depth=2):
+        """Major directory modules by entity density. depth=1 for top-level dirs."""
         db = self.store.db
-        rows = db.execute(
-            "SELECT substr(file,1,instr(file||'/','/')-1) AS top, COUNT(*) FROM nodes "
-            "WHERE file != '' GROUP BY top ORDER BY 2 DESC LIMIT 30").fetchall()
-        return {"modules": [{"top_dir": r[0], "entities": r[1]} for r in rows]}
+        rows = db.execute("SELECT file FROM nodes WHERE file != ''").fetchall()
+        agg = {}
+        for (f,) in rows:
+            comps = f.split("/")
+            key = "/".join(comps[:max(1, min(depth, len(comps)))])
+            agg[key] = agg.get(key, 0) + 1
+        out = sorted(({"module": k, "entities": v} for k, v in agg.items()),
+                     key=lambda x: -x["entities"])
+        return {"modules": out[:40]}
 
     def dialects(self, name=None):
         ds = self.store.nodes_by_kind(model.DIALECT)

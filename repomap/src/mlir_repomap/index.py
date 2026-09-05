@@ -140,9 +140,18 @@ class Indexer:
         # class -> pass id  (from td DEFINES props.tblgen_class and PASS_IMPLEMENTS edges)
         class_to_pass = {}
         for dst, props in db.execute("SELECT dst, props FROM edges WHERE kind='DEFINES'"):
-            tc = json.loads(props).get("tblgen_class")
-            if tc:
-                class_to_pass[tc] = dst
+            p = json.loads(props)
+            for key in ("tblgen_class", "cpp_class"):
+                if p.get(key):
+                    class_to_pass[p[key]] = dst
+            # MLIR idiom: impl::<TdClass>Base<> generated pass base
+            if p.get("tblgen_class"):
+                class_to_pass[p["tblgen_class"] + "Base"] = dst
+        # bridge: impl::<TdClass>Base<Concrete> -> concrete cpp class maps to the pass
+        for dst, props in db.execute("SELECT dst, props FROM edges WHERE kind='DEFINES'"):
+            p = json.loads(props)
+            if p.get("impl_base") and p.get("cpp_class") and p["impl_base"] in class_to_pass:
+                class_to_pass[p["cpp_class"]] = class_to_pass[p["impl_base"]]
         for src, dst in db.execute("SELECT src, dst FROM edges WHERE kind='PASS_IMPLEMENTS'"):
             class_to_pass[dst.split(":", 1)[-1]] = src
         # factory -> pass id(s); td `let constructor` links are authoritative (ADR-001).
@@ -215,6 +224,39 @@ class Indexer:
             if not row:
                 db.execute("INSERT INTO edges (src,dst,kind,props) VALUES (?,?,?,?)",
                            (pas, fac, "PASS_HAS_FACTORY", "{}"))
+
+        # cross-file dialect ownership: op/type/attr node id prefixes map to dialect ids
+        # (per-file resolution fails because ops live in a different .td than the dialect)
+        dialect_ids = set(r[0] for r in db.execute("SELECT id FROM nodes WHERE kind='dialect'"))
+        for nid, kind, file in db.execute(
+                "SELECT id, kind, file FROM nodes WHERE kind IN ('op','type','attr')"):
+            stem = nid.split(":", 1)[-1]
+            if stem.endswith("Op"):
+                stem = stem[:-2]
+            owner = None
+            parts = stem.split("_")
+            for i in range(len(parts) - 1, 0, -1):
+                cand = "dialect:" + "_".join(parts[:i])
+                if cand in dialect_ids:
+                    owner = cand
+                    break
+            if owner is None:
+                # type/attr defs often have no dialect prefix; match by directory name
+                segs = (file or "").split("/")
+                if "Dialect" in segs:
+                    cand = "dialect:" + segs[segs.index("Dialect") + 1]
+                    owner = cand if cand in dialect_ids else None
+            if owner:
+                cur = db.execute("SELECT 1 FROM edges WHERE src=? AND dst=? AND kind='DIALECT_OWNS'",
+                                 (owner, nid)).fetchone()
+                if not cur:
+                    db.execute("INSERT INTO edges (src,dst,kind,props) VALUES (?,?,?,?)",
+                               (owner, nid, "DIALECT_OWNS", '{"inferred": true}'))
+                    if file:
+                        db.execute(
+                            "INSERT INTO evidence SELECT edge_id,?,?,?,?, 'resolve', ? "
+                            "FROM edges WHERE src=? AND dst=? AND kind='DIALECT_OWNS'",
+                            (file, 1, 1, "", "inferred", owner, nid))
 
         # rewrite PASS_USES_PATTERN from pass_class:* to the owning pass when known
         for eid, src in db.execute(

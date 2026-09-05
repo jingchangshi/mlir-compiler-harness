@@ -5,11 +5,32 @@ from .. import model
 
 RE_PATTERN_CLASS = re.compile(
     r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\bpublic\s+'
-    r'(OpRewritePattern|OpConversionPattern|OpInterfaceConversionPattern|RewritePattern|'
-    r'OpTraitRewritePattern)\s*<\s*([\w:]*)')
+    r'(OpRewritePattern|OpConversionPattern|OpInterfaceConversionPattern|'
+    r'OpInterfaceRewritePattern|RewritePattern|OpTraitRewritePattern)\s*<\s*([\w:]*)')
 RE_PATTERNS_ADD = re.compile(r'patterns\.add\s*<\s*([\w:\s,]+?)\s*>\s*\(')
 RE_CREATE_OP = re.compile(r'(?:rewriter|builder|b)\.create\s*<\s*([\w:]+)\s*>')
 RE_CONV_ADD = re.compile(r'addConversion\(')
+
+
+RE_OUTOFLINE_METHOD = re.compile(
+    r'\b([A-Za-z]\w*)::(runOnOperation|initialize|run)\s*\([^;{]*\)\s*(?:const\s*)?\{')
+
+
+def _method_bodies(text):
+    """Out-of-line member function definitions -> (class_name, start, end)."""
+    out = []
+    for m in RE_OUTOFLINE_METHOD.finditer(text):
+        depth = 0
+        start = m.end() - 1
+        for i in range(start, len(text)):
+            if text[i] == '{':
+                depth += 1
+            elif text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    out.append((m.group(1), start, i))
+                    break
+    return out
 
 
 def _class_bodies(text):
@@ -31,8 +52,8 @@ def _class_bodies(text):
 
 def extract(relpath, text):
     nodes, edges = [], []
-    bodies = _class_bodies(text)
-    name_to_span = {n: (s, e) for n, m, s, e in bodies}
+    bodies = _class_bodies(text) + [(n, None, s, e) for n, s, e in _method_bodies(text)]
+    name_to_span = {n: (s, e) for n, m, s, e in _class_bodies(text)}
 
     def ev(start, end, conf=model.CONFIRMED):
         ls = text[:start].count("\n") + 1

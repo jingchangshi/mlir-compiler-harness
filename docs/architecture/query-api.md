@@ -18,7 +18,7 @@ to re-index; workflows must refresh before reasoning if stale).
 | CLI | service method | returns |
 |---|---|---|
 | `status` | repo_status() | repo root, HEAD, branch, dirty/changed vs index, counts by entity kind, diagnostics |
-| `modules` | modules() | major directory modules (top 2 levels of indexed corpus) with file/entity counts |
+| `modules [--depth N]` | modules(depth=2) | directory modules (top N path levels, default 2) with entity counts |
 | `dialects` | dialects(name=None) | dialect list w/ ops/types/attrs counts, def file |
 | `passes` | passes(query=None) | pass list: arg, kind (td/cpp), def file, summary |
 | `pass <name>` | get_pass(name) | full dossier (below) |

@@ -73,3 +73,26 @@ Context: incremental re-index only compares file hashes; changing extractor logi
 entities silently in the index (observed during validation).
 Decision: `last_build.indexer_version` is stored in metadata; a mismatch forces full
 re-extraction. Extractor logic changes must bump `INDEXER_VERSION` in model.py.
+
+## ADR-009 (2026-09-05, accepted) — workflow-driven extractor refinements (Phase 3)
+
+Context: executing the Phase 3 workflows on AscendNPU-IR exposed four real idioms the MVP
+extractors missed, each blocking a dossier section: (a) `OpInterfaceRewritePattern` base not
+recognized; (b) patterns registered in out-of-line `void X::runOnOperation()` bodies got no
+PASS_USES_PATTERN link; (c) passes deriving from generated `impl::<TdClass>Base<>` had no
+cpp-class→pass mapping; (d) dialect ownership failed when ops and dialect live in different
+.td files (per-file resolution).
+Decision: fix all four in the engine (generically, no repo-specific logic): extend the
+pattern base list; treat out-of-line `runOnOperation|initialize|run` bodies as pattern-set
+containers; bridge `impl::<TdClass>Base<Concrete>` via DEFINES props (`cpp_class` +
+`impl_base`) to the td pass; resolve DIALECT_OWNS at graph-resolution time from node-id
+prefixes and definition-directory names with `inferred` confidence. Also extend `modules`
+to take `--depth` (workflow needed 2–3 levels; 1-level output was useless for this repo).
+Evidence: PASS_USES_PATTERN edges 0→139 (79 distinct passes), DIALECT_OWNS 19→107,
+hivm-flatten-ops dossier pattern section now complete. All changes keep AscendNPU-IR names
+out of the core.
+Alternatives: defer everything to clangd (rejected: these idioms are textual and cheap);
+repo-specific heuristics (rejected by architecture principles).
+Consequences: INDEXER_VERSION bumps (9); partial Phase 3.5 value delivered early.
+Remaining known gap: `populateXxxPatterns()` free-function chasing still missing; clangd
+still deferred (ADR-003) — re-evaluate after adapter phases.

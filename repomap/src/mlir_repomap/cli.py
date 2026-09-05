@@ -14,7 +14,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     ap.add_argument("--reindex", action="store_true", help="force full re-index")
     sub.add_parser("status")
-    sub.add_parser("modules")
+    p = sub.add_parser("modules"); p.add_argument("--depth", type=int, default=2)
     sub.add_parser("dialects")
     p = sub.add_parser("passes"); p.add_argument("query", nargs="?")
     p = sub.add_parser("pass"); p.add_argument("name")
@@ -41,7 +41,8 @@ def main(argv=None):
     try:
         if args.cmd != "status":
             pass
-        fn = {"status": svc.repo_status, "modules": svc.modules, "dialects": svc.dialects,
+        fn = {"status": svc.repo_status, "modules": lambda: svc.modules(args.depth),
+              "dialects": svc.dialects,
               "passes": lambda: svc.passes(args.query), "pass": lambda: svc.get_pass(args.name),
               "pipelines": svc.pipelines, "pipeline": lambda: svc.get_pipeline(args.name),
               "symbol": lambda: svc.find_symbol(args.name),

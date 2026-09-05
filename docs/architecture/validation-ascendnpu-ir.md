@@ -12,9 +12,12 @@ Date: 2026-09-05 · Index: 2951 files scanned, 2504 re-extracted, 15.1 s full bu
 | kind | count | | kind | count |
 |---|---|---|---|---|
 | dialect | 13 | | pattern | 756 |
-| pass | 364 | | test | 953 |
+| pass | 364* | | test | 953 |
 | factory | 285 | | pipeline | 62 |
 | op | 111 | | interface | 23 |
+
+\* 364 was measured mid-Phase-2 before the class_to_pass/factory-resolution fixes; the
+settled count after Phase 3 is 332 passes (fewer synthesized cpp-only duplicates).
 
 All 13 in-repo dialects found (HIVM, HFusion, HACC, HIVMAVE, Scope, Symbol, Annotation,
 MemRefExt, MathExt, AscendDPX, HIVMRegbaseIntrins, TritonExt, Test). 576 pipeline→pass

@@ -6,7 +6,7 @@ from .. import model
 RE_PASS_CLASS = re.compile(
     r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\b(?:public\s+)?'
     r'(?:PassWrapper\s*<\s*\w+\s*,\s*(?:OperationPass|Pass)|'
-    r'OperationPass|PassWrapper|PassInfoMixin|Pass)\s*<')
+    r'OperationPass|PassWrapper|PassInfoMixin|impl\s*::\s*(\w+Base)|Pass)\s*<')
 RE_GETARG = re.compile(
     r'StringRef\s+getArgument\(\)\s*const\s*(?:override)?\s*{\s*return\s*"([^"]+)"')
 RE_FACTORY_DEF = re.compile(
@@ -51,6 +51,15 @@ def extract(relpath, text):
                           "evidence": ev(ln, ln + (ma and body[:ma.end()].count("\n") or 0))})
             edges.append({"src": f"file:{relpath}", "dst": nid, "kind": model.DEFINES,
                           "props": {"cpp_class": cls}, "evidence": ev(ln)})
+        elif m.group(2):
+            # generated-base idiom (impl::<TdClass>Base<Concrete>): no getArgument here.
+            # Emit a cpp_class mapping; resolve() bridges it via the td tblgen_class.
+            nodes.append({"id": f"pass_class:{cls}", "kind": model.PASS_CLASS,
+                          "name": cls, "summary": "", "file": relpath, "line": ln})
+            edges.append({"src": f"file:{relpath}", "dst": f"pass_class:{cls}",
+                          "kind": model.DEFINES,
+                          "props": {"cpp_class": cls, "impl_base": m.group(2)},
+                          "evidence": ev(ln)})
 
     # factory definitions
     for m in RE_FACTORY_DEF.finditer(text):

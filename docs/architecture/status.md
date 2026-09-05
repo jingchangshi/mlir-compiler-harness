@@ -1,27 +1,41 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–2 complete)
+Updated: 2026-09-05 (Phases 0–3 complete)
 
 ## Implemented
 
-- Phase 0 contract: entity/edge/evidence schema, stable query API v1, module boundaries, ADR-001..008.
-- Phase 1 MVP engine (`repomap/`): git facts, TableGen structural extractor (dialect/op/pass
-  incl. `let constructor`), C++ pass extractor, pipeline extractor with conditions & nesting,
-  pattern extractor, lit test extractor, SQLite store, QueryService, `mlir-repomap` CLI,
-  incremental re-index (hash + indexer-version invalidation), synthetic fixture tests (7/7).
-- Phase 2 real-repo validation on AscendNPU-IR: see `validation-ascendnpu-ir.md`.
-  364 passes, 13 dialects, 62 pipelines, 756 patterns, 953 tests, 576 pipeline memberships,
-  15 s full index, 0 parse diagnostics.
+- Phase 0 contract: schema, query API v1, module boundaries, ADR-001..009.
+- Phase 1 MVP engine: extractors (git / TableGen / C++ pass / pipeline+conditions / pattern /
+  lit test), SQLite store, QueryService, CLI, incremental index (hash + indexer-version
+  invalidation), fixture tests (7/7).
+- Phase 2 validation on AscendNPU-IR: `validation-ascendnpu-ir.md`.
+- Phase 3 agent-independent workflows (`docs/workflows/{repo-map,pass-analysis,pipeline-audit}.md`)
+  and their real-repo execution on AscendNPU-IR:
+  - `docs/compiler-architecture/` (repository/dialect/pipeline maps + pass catalog),
+  - two full pass dossiers (`passes/hivm-flatten-ops.md`, `passes/hfusion-merge-vf.md`),
+  - one pipeline audit (`pipelines/regbase-hivm-post-bufferization.md`) with 6 classified findings.
+- Workflow-driven engine fixes (ADR-009): pattern base list, out-of-line runOnOperation
+  containers, generated-base class bridging, cross-file dialect ownership, `modules --depth`.
+  Result: 139 pattern links over 79 passes (≈0 before), 107 dialect-ownership edges, 5400 edges total.
+
+## Validation of the core Phase-3 question
+
+Deterministic facts were sufficient for all three workflows. Every dossier section was
+fillable from queries + evidence-pointed files; repository-wide grep was not needed.
+Two query/extractor gaps surfaced and were fixed (modules depth, pattern idioms); one
+remains (`populate*` chasing) and did not block the workflows.
 
 ## Current limitations
 
-- Pattern→pass links via `populateXxxPatterns()` helper functions are not chased (largest gap).
-- Pipelines are detected by signature pattern; some entry points (`runRegBaseCompile`) missed.
-- Op extraction covers direct and one-level multiclass aliases only.
-- Same-name factories across namespaces resolved by a flagged locality heuristic (ADR-007).
-- Test coverage is name/flag matching (heuristic); no CHECK-body interpretation.
-- No MCP, no agent skills, no clangd yet (deliberately deferred).
+- `populateXxxPatterns()` free-function chasing still missing (139/79 coverage, not 332/332).
+- Pipeline detection is signature-based; some entry functions (e.g. `runRegBaseCompile`) missed.
+- Op extraction covers direct defs and one-level multiclass aliases.
+- Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).
+- Test links are name/flag heuristics; `tests <pipeline>` often empty because RUN lines
+  reference tool flags, not builder names.
+- No MCP, no agent skills, no clangd (deliberately deferred).
 
 ## Next recommended phase
 
-Phase 3 (agent-independent workflows) — see roadmap.md.
+Phase 4 (agent adapters: ZCode skills + DeepSeek Harness templates) — see roadmap.md;
+pattern chasing stays open as Phase 3.5 background work.
