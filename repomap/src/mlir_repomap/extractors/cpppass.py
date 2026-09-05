@@ -80,6 +80,47 @@ def extract(relpath, text):
                       "kind": model.REFERENCES, "props": {"via": "PassRegistration"},
                       "evidence": ev(ln)})
 
+    # PyBind-style binding boundary (Phase 9): a string name mapped to a C++ function,
+    # via m.def("name", fn) / WRAPPER-style macros ("name", fn), OR via m.def("name",
+    # [](PassManager &pm){ ... createXPass() ... }) lambdas whose body holds the factory.
+    for m in re.finditer(r'\bm\.def\(\s*"([a-z0-9_]+)"', text):
+        bind = m.group(1)
+        ln = line_of(m.start())
+        nodes.append({"id": f"binding:{bind}", "kind": model.BINDING, "name": bind,
+                      "summary": "binding boundary", "file": relpath, "line": ln})
+        # lambda form: m.def("name", [](args...) { ... createXPass(...) ... });
+        lam = re.search(r'\[\s*\]\s*\(', text[m.end():m.end() + 400])
+        if lam:
+            body_open = m.end() + text[m.end():m.end() + 400].find('{')                 if '{' in text[m.end():m.end() + 400] else -1
+            if body_open == -1:
+                seg = text[m.end():m.end() + 400]
+            else:
+                depth = 0
+                close = body_open
+                for i in range(body_open, min(body_open + 4000, len(text))):
+                    if text[i] == '{':
+                        depth += 1
+                    elif text[i] == '}':
+                        depth -= 1
+                        if depth == 0:
+                            close = i
+                            break
+                seg = text[body_open:close]
+            fm = re.search(r'\bcreate(\w+Pass)\s*\(', seg)
+            if fm:
+                edges.append({"src": f"binding:{bind}",
+                              "dst": f"factory:create{fm.group(1)}",
+                              "kind": model.BINDING_MAPS_TO, "props": {"via": "lambda"},
+                              "evidence": ev(ln, ln + seg.count("\n"))})
+            continue
+        # direct function-reference form: m.def("name", createXPass)
+        fm = re.search(r'"\s*,\s*([A-Za-z:][\w:]*)', text[m.end():m.end() + 200])
+        if fm:
+            edges.append({"src": f"binding:{bind}",
+                          "dst": f"function:NAME:{fm.group(1).split('::')[-1]}",
+                          "kind": model.BINDING_MAPS_TO, "props": {},
+                          "evidence": ev(ln)})
+
     # IR attribute name references (QG-4): `XxxAttr::name` and `kXxxAttr` constants
     attr_hits = {}
     for m in re.finditer(r'\b(\w+Attr)::name', text):

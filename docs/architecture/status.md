@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–8 complete)
+Updated: 2026-09-05 (Phases 0–9 complete)
 
 ## Implemented
 
@@ -56,6 +56,12 @@ remains (`populate*` chasing) and did not block the workflows.
   docs; 4 pass dossiers (incl. the cross-repo annotation handoff); Python/C++ hybrid
   pipeline audit (make_ttgir) with three lowering frontiers and four hidden contracts;
   2 generic fixes; EG-1 (Python pipeline) recorded as the headline gap with design.
+
+- Phase 9 cross-language provenance (ADR-015, `docs/validation/phase9/`): binding
+  boundary entities + Python pipeline-composition functions (ast-based, signature
+  detection) + full chain resolution; `pipeline-composition` query; pipeline-kind
+  correctness (runOnOperation fix); triton-ascend 15 chains mapped; AscendNPU-IR
+  regression clean.
 
 ## Current limitations
 

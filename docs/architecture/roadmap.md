@@ -1,18 +1,25 @@
 # Roadmap
 
-done: Phase 0-8 (contract, engine, validation, workflows, adapters, deep validation,
-provenance graph, provenance-aware workflows, Ascend ecosystem validation; ADR-001..014).
-Repos validated: AscendNPU-IR (baseline), triton-ascend.
+done: Phase 0-9 (contract, engine, validation, workflows, adapters, deep validation,
+provenance graph, provenance-aware workflows, ecosystem validation, cross-language
+provenance; ADR-001..015). Repos validated: AscendNPU-IR (baseline), triton-ascend
+(C++ + Python hybrid).
 
 current: none.
 
-next (based on refined Phase 8 evidence):
-1. **EG-1 Python pipeline extractor** (headline): ADD_PASS_WRAPPER bindings + make_*
-   stage lists → Python pipeline-builder nodes in the generic model. Unlocks pipeline
-   provenance for the whole Triton ecosystem side of the Ascend stack.
-2. **runOnOperation pipeline-builder mislabel** (small, same family).
-3. **RG-1 attribute-creator tracing** (both repos benefit).
-4. **EG-2 dialect-transition edges**: revisit once a workflow consumes them.
+next (based on Phase 9 evidence):
+1. **Dialect-transition edges (EG-2 promotion candidate)**: with cross-language chains
+   in place, the triton→HIVM/HFusion handoff is now the visible frontier; a
+   DIALECT_TRANSITIONS edge (from pass input/output op ownership) would make ecosystem
+   audits queryable — requires a consuming workflow first (pass-analysis dialect
+   transition step).
+2. **RG-1 attribute-creator tracing**: marker-construction call sites (setAttr /
+   createAlignMarkOp) — both repos benefit.
+3. **pm.run stage markers as edges**: turn composition-function pm.run calls into
+   per-stage verification boundaries.
+
+deferred (unchanged): MCP, clangd, gtest coverage extraction, cross-repo handoff
+declarations (QG-7) — none blocking; the ecosystem now spans two repos with provenance.
 
 deferred: MCP, clangd, EG-5 gtest coverage, cross-repo handoff edges (QG-7) — none
 blocking; revisit after EG-3.

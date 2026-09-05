@@ -205,3 +205,21 @@ documents the full Python builder → C++ wrapper → pass chain manually
 dialect-transition edges and Python pipeline nodes both deferred — the former lacks a
 workflow consumer, the latter needs its extractor design first. Phase 8 numbering:
 EG-1 Python pipeline, EG-2 dialect-transition edges, EG-3 registration idioms.
+
+## ADR-015 (2026-09-05, accepted) — Cross-language compiler construction provenance
+
+Context: Phase 8's headline gap — the Ascend flow's authoritative builder is Python
+(`backend/compiler.py` stage lists via PyBind bindings), invisible to the C++ graph.
+Decision: model the **binding boundary** as a generic entity (`binding:<name>`), matched
+by the PyBind def/wrapper idiom with brace-matched lambda bodies (factory found inside);
+model Python pipeline-composition functions by **signature** (pass-manager param/usage),
+never by name; resolve the full chain PYTHON_COMPOSES → binding → factory →
+BINDING_EXPOSES_PASS → pass. Pipeline-kind correctness: runOnOperation/initialize bodies
+are pass methods, not pipeline builders. New query `pipeline-composition <pass>` with a
+workflow consumer (pipeline-audit cross-language lens; repo-map composition map).
+Evidence: docs/validation/phase9/ — 15 chains in triton-ascend
+(pipeline-composition-map.md), AscendNPU-IR regression clean (runOnOperation nodes 0,
+RegBase builders intact), two dossier "why here" upgrades. Implementation notes: Python
+parsing via stdlib ast with BOM stripping (vendor files carry U+FEFF).
+Consequences: Python-pipeline provenance is now a generic capability, not a Triton
+feature; attribute creator semantics (RG-1) and pm.run verification edges remain open.

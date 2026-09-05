@@ -39,6 +39,15 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1b. **Cross-language provenance lens** — every pipeline must answer: *where does it
+   originate?* If stages cannot be explained by C++ builders, run
+   `mlir-repomap pipeline-composition <pass>` per stage and reconstruct the chain
+   **Python composition function → binding (`m.def`/wrapper) → C++ factory → pass**,
+   each hop with file:line. Python stage lists (e.g. `make_*` functions calling
+   `passes.<group>.add_*(pm, ...)`) are pipeline builders in the full sense — audit
+   their order, guards, and options with the same rigor as C++ builders, and state
+   which language constructs the pipeline and where passes are inserted.
+
 2. **Hidden invariants / cross-pass state (attribute contracts)** — pass options or IR
    markers that one stage writes and another reads. For every annotation/metadata/marker
    attribute discovered in the stages, run `mlir-repomap attribute <Name>Attr` and record

@@ -390,6 +390,31 @@ class QueryService:
         creates = self._evidence_summary(self.store.edges_to(aid, model.CREATES_ATTRIBUTE))
         return {"attribute": node, "referenced_by": refs, "created_by": creates}
 
+    def pipeline_composition(self, name):
+        """Cross-language construction chain for a pass (Phase 9):
+        Python composition function -> binding -> C++ factory -> pass."""
+        r = self._resolve_pass(name)
+        if r is None or (isinstance(r[1], dict) and "error" in r[1]):
+            return r[1] if isinstance(r[1], dict) else {"error": "not found"}
+        nid, node = r
+        out = {"pass": node, "composition": []}
+        for e in self._evidence_summary(
+                self.store.edges_to(nid, model.BINDING_EXPOSES_PASS)):
+            bind = e["src"]
+            bnode = self._node_or_none(bind) or {"id": bind}
+            composers = [x["src"] for x in self.store.edges_to(bind, model.PYTHON_COMPOSES)]
+            maps = self.store.edges_from(bind, model.BINDING_MAPS_TO)
+            out["composition"].append({
+                "binding": bind, "node": bnode, "confidence": e["confidence"],
+                "evidence": e["evidence"],
+                "maps_to": [{"dst": m["dst"], "evidence": m["evidence"]}
+                            for m in maps],
+                "python_composers": composers})
+        # direct td-constructor path (no binding) for contrast
+        out["direct_factory"] = [e["dst"] for e in
+                                 self.store.edges_from(nid, model.PASS_HAS_FACTORY)]
+        return out
+
     def get_evidence(self, ident):
         if ident.startswith("file:"):
             return {"evidence": []}

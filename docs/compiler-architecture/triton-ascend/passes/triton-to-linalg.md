@@ -76,3 +76,14 @@ selection (not a rejection, but a hard semantic fork).
    responsibility concentration; the Phase-5-style audit lens would flag it.
 3. **[Coverage | Potential]** 46 tests cover the flow, but the comment-documented
    error-341 scenario has no named test found via `repo tests`.
+
+# Phase 9: Cross-language Composition ("why here")
+
+`repo pipeline-composition triton-to-linalg` now answers the question this dossier could
+only answer by reading Python: this pass appears in the flow because the **Python
+composition function `ttir_to_linalg`** (`third_party/ascend/backend/compiler.py`) calls
+the binding `add_triton_to_linalg` (`third_party/ascend/triton_ascend.cc:84`, PyBind
+lambda), which maps to `factory:createTritonToLinalgPass` -> this pass. The C++
+`init_triton_ascend_passes_ttir` registration (order 5) is the tooling view; the
+production stage list is the Python one -- both now resolvable from the graph (EG-1
+closed).

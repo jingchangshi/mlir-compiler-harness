@@ -10,7 +10,7 @@ import os
 import time
 
 from . import model, repo
-from .extractors import tablegen, cpppass, pipeline, pattern, tests
+from .extractors import tablegen, cpppass, pipeline, pattern, tests, python
 from .store import Store
 
 DEFAULT_EXCLUDES = ["third-party", "third_party", "build", ".git", ".mlir-repomap",
@@ -51,6 +51,8 @@ def _extractors_for(rel):
         return [cpppass, pipeline, pattern]
     if ext == ".mlir":
         return [tests]
+    if ext == ".py":
+        return [python]
     return []
 
 
@@ -307,6 +309,62 @@ class Indexer:
                         db.execute("UPDATE edges SET props=json_set(props,"
                                    "'$.disambiguation',?) WHERE edge_id=?",
                                    (disamb, eid))
+        # binding markers: BINDING_MAPS_TO -> function ids; PYTHON_COMPOSES -> bindings;
+        # then expose passes through bindings (Python -> binding -> factory -> pass)
+        binding_defs = {}
+        for eid, dst, src_ in db.execute(
+                "SELECT edge_id, dst, src FROM edges WHERE kind='BINDING_MAPS_TO'").fetchall():
+            if dst.startswith("factory:"):
+                binding_defs[src_] = dst  # lambda branch already resolved to the factory
+                continue
+            if not dst.startswith("function:NAME:"):
+                continue
+            nm = dst.split("function:NAME:", 1)[-1]
+            # the mapped symbol is usually a C++ pass FACTORY (createXPass)
+            fac = db.execute("SELECT id FROM nodes WHERE kind='factory' AND name=?",
+                             (nm,)).fetchone()
+            if fac:
+                db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (fac[0], eid))
+                binding_defs[src_] = fac[0]
+            else:
+                ids = [r[0] for r in db.execute(
+                    "SELECT id FROM nodes WHERE kind='function' AND name=?", (nm,))]
+                if len(ids) == 1:
+                    db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (ids[0], eid))
+                    binding_defs[src_] = ids[0]
+                else:
+                    db.execute("DELETE FROM evidence WHERE edge_id=?", (eid,))
+                    db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+        # name-based binding markers from Python composers
+        binding_ids = {}
+        for bid in [r[0] for r in db.execute("SELECT id FROM nodes WHERE kind='binding'")]:
+            binding_ids[bid.split(":", 1)[-1]] = bid
+        for eid, dst in db.execute(
+                "SELECT edge_id, dst FROM edges WHERE kind='PYTHON_COMPOSES' "
+                "AND dst LIKE 'binding:NAME:%'").fetchall():
+            nm = dst.split("binding:NAME:", 1)[-1]
+            bid = binding_ids.get(nm)
+            if bid:
+                db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (bid, eid))
+            else:
+                db.execute("DELETE FROM evidence WHERE edge_id=?", (eid,))
+                db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+        # binding -> pass via the mapped C++ function being a known factory
+        fac_to_pass_full = dict(fac_to_pass)
+        for pas, fac in db.execute(
+                "SELECT src, dst FROM edges WHERE kind='PASS_HAS_FACTORY'"):
+            fac_to_pass_full[fac] = pas
+        for bid, fnid in binding_defs.items():
+            tgt = fac_to_pass_full.get(fnid)
+            if not tgt:
+                row = db.execute("SELECT dst FROM edges WHERE kind='PASS_HAS_FACTORY' "
+                                 "AND dst=?", (fnid,)).fetchone()
+                tgt = row[0] if row else None
+            if tgt:
+                db.execute("INSERT OR IGNORE INTO edges (src,dst,kind,props) "
+                           "VALUES (?,?,?,?)",
+                           (bid, tgt, "BINDING_EXPOSES_PASS", "{}"))
+
         # resolve cross-file populator call markers to function ids (QG-3)
         func_names = {}
         for fid, nm in db.execute("SELECT id, name FROM nodes WHERE kind='function'"):

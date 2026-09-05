@@ -58,6 +58,9 @@ Scope guard: this workflow maps architecture. It does NOT do per-pass correctnes
    - `attribute-map.md`: for each `attribute:<Name>` entity, producers (confirmed
      creators) and consumers (referencing files/passes) — the cross-pass attribute
      contract inventory.
+   - `pipeline-composition-map.md` (when the repo composes pipelines outside C++):
+     per pass, the cross-language construction chain — Python composition function →
+     binding (`m.def`/wrapper) → C++ factory → pass — with evidence and confidence.
    Both maps are generated from RepoMap queries (CLI or QueryService); hand-edits follow
    the `<!-- human-note -->` rule below.
 

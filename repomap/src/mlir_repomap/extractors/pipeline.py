@@ -77,7 +77,10 @@ def extract(relpath, text):
             continue
         cb = _match_brace(text, ob)
         body = text[ob:cb]
-        if "addPass(" in body or ".nest<" in body:
+        # pass methods that build nested OpPassManagers are NOT pipeline builders
+        # (Phase 9 pipeline-kind correctness): skip the known pass-method names
+        if m.group(2) not in ("runOnOperation", "initialize") and (
+                "addPass(" in body or ".nest<" in body):
             functions.append((m.group(2), m.group(1), ob, cb))
         elif RE_CALL_BUILD.search(body):
             # small dispatch functions still count as pipelines when they build pipelines

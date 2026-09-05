@@ -23,7 +23,8 @@ file-qualified candidates. `PIPELINE_CONTAINS` edges carry both `order` (per-sco
 | `pattern` | `pattern:<CppClass>` | `struct X : OpRewritePattern<FooOp>` etc. |
 | `interface` | `interface:<Name>` | `def X : Interface<...>` in .td |
 | `test` | `test:<repo-relative-path>` | files with `RUN:` lines; `summary` carries heuristic `features:` tags (dynamic-shape, reduction, fusion, vectorization, bufferization, stride-align, nested-region) |
-| `function` | `function:<file>:<name>` | C++ functions that take `RewritePatternSet&` (pattern-set helpers/populators) and pipeline builders |
+| `function` | `function:<file>:<name>` | C++ functions that take `RewritePatternSet&` (pattern-set helpers/populators), pipeline builders, and **Python pipeline-composition functions** (signature-based: pass-manager param/usage, never name-based) |
+| `binding` | `binding:<name>` | PyBind-style binding boundary: a string name mapped to a C++ function/factory via `m.def("name", fn)` or wrapper macros; lambda bodies are brace-matched to find the mapped factory |
 | `attribute` | `attribute:<Name>` | IR attribute names referenced as `<Name>Attr::name` |
 | `symbol` | `func:<name>` / `cppclass:<Name>` | free C++ functions/classes of interest |
 | `file` | `file:<relpath>` | git tracked files (lightweight; for provenance queries) |
@@ -52,6 +53,9 @@ Directed; `src`/`dst` are node ids. Edge kinds (MVP set):
 | `FUNCTION_DEFINES_PATTERN` | function -> pattern | `patterns.add<X>(...)` inside a pattern-set function | confirmed |
 | `FUNCTION_CALLS` | function -> function | pattern-set helper call chain (populate -> register -> add) | confirmed |
 | `PIPELINE_BUILT_BY` | pipeline -> builder function | pipeline builder definition | confirmed (ADR-012) |
+| `BINDING_MAPS_TO` | binding -> C++ function/factory | PyBind def / wrapper macro / lambda body factory call | confirmed (ADR-015) |
+| `PYTHON_COMPOSES` | Python composition function -> binding | `passes.<group>.add_*(pm, ...)` stage call inside a composition function | confirmed |
+| `BINDING_EXPOSES_PASS` | binding -> pass | resolved chain binding -> factory -> pass | confirmed (ADR-015) |
 | `CREATES_ATTRIBUTE` | pass -> attribute | `<Name>Attr::name` referenced inside pass class body | inferred |
 | `REFERENCES` | generic symbol reference fallback | text search | heuristic |
 | `PATTERN_MATCHES_OP` | pattern -> op | template arg of OpRewritePattern/OpConversionPattern | confirmed |

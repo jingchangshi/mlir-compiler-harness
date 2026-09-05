@@ -32,6 +32,7 @@ to re-index; workflows must refresh before reasoning if stale).
 | `pattern-owner <pattern>` | pattern_owner(name) | provenance chain: pattern -> defining pattern-set function(s) -> pass(es), with evidence |
 | `pipeline-builder <pipeline>` | pipeline_builder(name) | file-qualified builder function(s), sub-pipeline calls, callers |
 | `attribute <name>` | get_attribute(name) | attribute provenance: referencing files (heuristic) + confirmed creating pass classes |
+| `pipeline-composition <pass>` | pipeline_composition(name) | cross-language construction chain: Python composition function → binding → C++ factory → pass, with evidence |
 
 Token discipline: every command returns compact JSON with `file:line` pointers, never file
 contents; the agent opens only what it needs. `pass <name>` is the one-stop dossier for the

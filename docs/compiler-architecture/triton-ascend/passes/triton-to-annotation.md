@@ -72,3 +72,12 @@ value tracking — RG-1 territory, backlog.
    dialect appears as an *external* dependency here (query gap QG-7).
 2. **[Coverage | Potential]** No dedicated lit test found linking this pass by arg name;
    coverage is end-to-end via the triton→ascend kernel tests.
+
+# Phase 9: Cross-language Composition ("why here")
+
+`repo pipeline-composition triton-to-annotation`: Python composer `ttir_to_linalg`
+(`backend/compiler.py`) -> binding `add_triton_to_annotation` (triton_ascend.cc) ->
+`factory:createTritonToAnnotationPass` -> this pass. The pass sits at stage order 4 of the
+C++ registration and before `triton_to_hivm` in the Python stage list because the baseline
+stack's annotation consumers require marks to exist before HIVM lowering -- now
+evidenced by both composition frontends from one query.
