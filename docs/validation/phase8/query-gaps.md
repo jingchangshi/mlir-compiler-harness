@@ -1,12 +1,13 @@
 # Phase 8 Query Gaps
 
-- QG-7 — Cross-repo handoff contract: `triton-to-linalg` emits hfusion ops consumed by the
-  AscendNPU-IR stack, but the two indexes are separate; no query answers "which dialect
-  boundary does this repo feed". Impact: ecosystem-level audits need manual joining.
-  Fix direction: corpus-level `external_dialect` declarations (repo config) + edges from
-  passes to external dialect ops by type name. Priority: Low-Medium (only matters for
-  multi-repo audits).
-- QG-8 — `tests` for C++ gtest files returns feature tags but no pass links (EG-5 below
-  the query level). Priority: Medium.
-- No other query shortfalls: pattern-owner / pipeline-builder / attribute worked
-  unchanged on the new repo.
+- **QG-7 — cross-repo handoff contract**: `triton-to-annotation` forwards attributes into
+  the bishengir annotation dialect consumed by the baseline repo's stride-align machinery;
+  `triton_to_hivm`/`triton_to_hfusion` hand the IR to the baseline stack. The two indexes
+  are separate by design, so no query answers "which dialect boundary does this repo feed
+  and who consumes it". Fix direction: `external_dialect` declarations in repo config +
+  edges from passes to external dialect type names. Priority: Low-Medium (first real need
+  appeared this phase; no workflow blocked).
+- **QG-8 — gtest files carry feature tags but no TEST_COVERS_PASS links** (third_party/
+  ascend/unittest). Priority: Medium.
+- No other gaps: pattern-owner / pipeline-builder / attribute / tests all worked
+  unchanged on the new repository.

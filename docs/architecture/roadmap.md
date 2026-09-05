@@ -6,13 +6,13 @@ Repos validated: AscendNPU-IR (baseline), triton-ascend.
 
 current: none.
 
-next (based on Phase 8 evidence):
-1. **EG-3 Python pipeline-composition extractor** (recommended next): ADD_PASS_WRAPPER
-   bindings + Python stage lists — unlocks pipeline provenance for the entire Triton
-   ecosystem side and connects triton-ascend's upstream path.
-2. **EG-1 fix** (small): stop classifying runOnOperation bodies as pipeline builders.
-3. **RG-1 attribute-creator tracing**: marker-construction call sites (upgrades
-   CREATES_ATTRIBUTE beyond inferred; benefits both repos).
+next (based on refined Phase 8 evidence):
+1. **EG-1 Python pipeline extractor** (headline): ADD_PASS_WRAPPER bindings + make_*
+   stage lists → Python pipeline-builder nodes in the generic model. Unlocks pipeline
+   provenance for the whole Triton ecosystem side of the Ascend stack.
+2. **runOnOperation pipeline-builder mislabel** (small, same family).
+3. **RG-1 attribute-creator tracing** (both repos benefit).
+4. **EG-2 dialect-transition edges**: revisit once a workflow consumes them.
 
 deferred: MCP, clangd, EG-5 gtest coverage, cross-repo handoff edges (QG-7) — none
 blocking; revisit after EG-3.

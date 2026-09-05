@@ -1,38 +1,36 @@
-# Phase 8 Extractor Gaps
+# Phase 8 Extractor Gaps (goal §9 numbering)
 
-## EG-1 — runOnOperation bodies that build OpPassManagers are classified as pipelines
+## EG-1 — Python pipeline composition (headline gap)
 
-Example: `ComputeBlockOptPass.cpp` runOnOperation (25 extracted "stages"), AddDynamicCVPipeline.
-Impact: pipeline list contains pass implementations; audit queries by builder return pass
-bodies. Generic fix: exclude functions named runOnOperation/initialize from pipeline-node
-creation (they are pass methods; keep their contained edges attached to the pass).
-Priority: Medium-High (visible in the top pipelines of triton-ascend).
+`third_party/ascend/backend/compiler.py` `make_ttir`/`make_ttgir` are the authoritative
+builders; passes are exposed via `python/src/passes.cc` `ADD_PASS_WRAPPER("add_x",
+createXPass)` bindings and invoked as `ascend.passes.ttir.add_x(pm)`.
+Impact: upstream Triton passes show no pipeline membership; the production stage order is
+invisible to the graph (audits read the .py manually — see pipeline-audit/make-ttgir.md).
+Generic solution (recorded, not implemented per phase rules): a Python/PyBind pipeline
+extractor — (a) parse `ADD_PASS_WRAPPER` bindings into factory-reference edges;
+(b) parse `make_*` functions' `passes.<group>.add_*(pm, ...)` call sequences into
+file-qualified Python pipeline builder nodes (the generic "pipeline builder" abstraction
+already exists — only the extractor is missing). Priority: **High** (ecosystem-wide).
 
-## EG-2 — upstream td without `let constructor` ⇒ factory absent
+## EG-2 — dialect-transition edges
 
-Not a bug: create* functions are tblgen-generated (build tree, ADR-001). Documented in
-pass-catalog. A `references` on python/src/passes.cc ADD_PASS wrappers is the runtime
-composition point (see EG-3). Priority: none (informational).
+TTIR→TTGIR→HIVM/HFusion/LLVM/Linalg transitions are visible only via pass dossiers.
+Generic schema candidate (dialect-transition edge kind), deferred: both repos would
+benefit, but no current workflow consumes it; the audit documented transitions manually
+this phase. Priority: Medium, revisit with a consumer.
 
-## EG-3 — Python-side pipeline composition invisible
+## EG-3 — registration idioms
 
-`python/src/passes.cc` ADD_PASS_WRAPPER bindings + Python compiler stages compose the
-upstream Triton pipeline. Impact: upstream passes show no pipeline membership. Generic fix
-direction: parse ADD_PASS_WRAPPER bindings as factory references and optionally follow
-Python stage lists. Priority: High for Triton-ecosystem repos, Medium overall.
+Catalogued: bare generated-base inheritance in headers (FIXED this phase: RE_PASS_CLASS
+accepts `(impl::)?XxxBase<`); C++-only `PassRegistration` families; upstream td without
+`let constructor` (factory absent by design, ADR-001); factory suffix matching added for
+dialect-prefixed classes; hardcoded kernel-name carve-outs in pass logic
+(`pcb10_tc01_kernel` in merge-small-block — reported via dossier, not an extractor issue).
 
-## EG-4 — bare generated-base inheritance (FIXED in Phase 8)
+## Carried from the earlier Phase 8 pass (renumbered)
 
-`class X : public XxxBase<T>` in headers (no `impl::`): RE_PASS_CLASS now accepts
-`(impl::)?XxxBase<`. Re-validated on both repos (triton-to-linalg ownership chain resolved).
-
-## EG-5 — gtest coverage not extracted
-
-`third_party/ascend/unittest` (186 entities incl. tests) produces no TEST_COVERS_PASS
-edges (C++ TEST() macros). Generic fix direction: gtest TEST(Suite, Name) discovery with
-pass-arg matching in test bodies. Priority: Medium.
-
-## Also fixed generically this phase
-
-- factory suffix matching for dialect-prefixed td classes (createAccelerateMatmulPass ↔
-  TritonGPUAccelerateMatmul) — kept, future-proofing for repos that do define factories.
+- runOnOperation-internal OpPassManager builders misclassified as pipelines → now part
+  of the EG-1/EG-3 family (a pass method building a pipeline is a "pipeline builder"
+  attached to the pass, not a standalone pipeline). Fix design unchanged; Priority Medium-High.
+- gtest coverage extraction (was EG-5, now QG-8). Priority: Medium.

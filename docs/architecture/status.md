@@ -51,10 +51,11 @@ remains (`populate*` chasing) and did not block the workflows.
   (pattern-map.md, attribute-map.md); regbase audit re-run with builder chains and swap
   outcomes; no new query type needed.
 
-- Phase 8 Ascend ecosystem validation (ADR-014, `docs/validation/phase8/`): harness
-  migrated to triton-ascend (1255 files, 11 s, 0 diagnostics); six architecture docs
-  generated; 3 pass dossiers incl. the upstream-idiom probe; 2 generic fixes (bare
-  generated-base EG-4, factory suffix matching); gaps EG-1/3/5 recorded with designs.
+- Phase 8 Ascend ecosystem validation (ADR-014 + supplement, `docs/validation/phase8/`):
+  harness migrated to triton-ascend (1255 files, 11 s, 0 diagnostics); six architecture
+  docs; 4 pass dossiers (incl. the cross-repo annotation handoff); Python/C++ hybrid
+  pipeline audit (make_ttgir) with three lowering frontiers and four hidden contracts;
+  2 generic fixes; EG-1 (Python pipeline) recorded as the headline gap with design.
 
 ## Current limitations
 
