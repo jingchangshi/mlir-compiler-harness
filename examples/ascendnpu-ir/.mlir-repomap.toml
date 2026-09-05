@@ -1,0 +1,3 @@
+# RepoMap engine corpus scoping (ADR-005)
+include = ["bishengir"]
+exclude = ["third-party", "third_party", "build", ".git", "bishengir/triton", "__pycache__"]

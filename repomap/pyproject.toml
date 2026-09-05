@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlir-repomap"
+version = "0.1.0"
+description = "Agent-independent MLIR/LLVM compiler repository analysis harness (RepoMap engine)"
+requires-python = ">=3.9"
+
+[project.scripts]
+mlir-repomap = "mlir_repomap.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"

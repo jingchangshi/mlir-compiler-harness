@@ -1,0 +1,125 @@
+"""Synthetic fixture repositories + unit tests for extractor and query behavior."""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from mlir_repomap.index import Indexer  # noqa: E402
+from mlir_repomap.query import QueryService  # noqa: E402
+
+FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def _git(cwd, *args):
+    subprocess.run(["git", "-C", cwd, "-c", "user.email=t@t", "-c", "user.name=t", *args],
+                   capture_output=True, check=True)
+
+
+class FixtureTest(unittest.TestCase):
+    """One shared index over the simple-pass fixture (conditional pipeline, patterns)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = os.path.join(FIXTURES, "simple-pass")
+        idx = Indexer(cls.repo)
+        idx.build(full=True)
+        idx.close()
+        cls.svc = QueryService(cls.repo)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.svc.close()
+
+    def test_dialect_and_ops_extracted(self):
+        d = self.svc.dialects("Simple")
+        self.assertEqual(len(d["dialects"]), 1)
+        self.assertEqual(d["dialects"][0]["owns"].get("op"), 1)
+
+    def test_pass_dossier(self):
+        r = self.svc.get_pass("simple-fold")
+        self.assertNotIn("error", r)
+        self.assertTrue(any(e["src"].endswith(".td") for e in r["definition"]))
+        self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
+        mem = {m["scope"]: m for m in r["pipeline_memberships"]}
+        self.assertIn("module", mem)
+        self.assertIn("func::FuncOp", mem)
+        self.assertEqual(mem["module"]["condition"], "config.getEnableFancy()")
+        pats = r["patterns"]
+        self.assertEqual(len(pats), 1)
+        self.assertEqual(pats[0]["matches_ops"], ["op:Simple_FoldOp"])
+        self.assertEqual(pats[0]["creates_ops"], ["op:Simple_CanonicalOp"])
+        self.assertTrue(r["tests"])
+
+    def test_pipeline_order_and_conditions(self):
+        r = self.svc.get_pipeline("buildSimplePipeline")
+        self.assertNotIn("error", r)
+        conds = {s["pass"]: s["condition"] for s in r["stages"]}
+        self.assertIsNone(conds.get("pass:Inline"))
+        self.assertEqual(conds.get("pass:simple-fold"), "config.getEnableFancy()")
+        self.assertTrue(r["sub_pipelines"])
+
+    def test_incremental_unchanged(self):
+        idx = Indexer(self.repo)
+        stats = idx.build()  # no changes
+        idx.close()
+        self.assertEqual(stats["reextracted"], 0)
+        self.assertGreater(stats["unchanged"], 0)
+
+    def test_incremental_reextracts_on_touch(self):
+        target = os.path.join(self.repo, "lib", "SimpleFold.cpp")
+        with open(target, "a") as f:
+            f.write("\n// touch\n")
+        idx = Indexer(self.repo)
+        stats = idx.build()
+        idx.close()
+        self.assertEqual(stats["reextracted"], 1)
+        # dossier still complete after re-extraction
+        svc = QueryService(self.repo)
+        r = svc.get_pass("simple-fold")
+        svc.close()
+        self.assertEqual(r["factory"], ["factory:createSimpleFoldPass"])
+
+    def test_fail_soft_on_bad_file(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            _git(tmp, "init", "-q")
+            with open(os.path.join(tmp, "broken.cpp"), "w") as f:
+                f.write("struct \x01 Broken : public PassWrapper< {")
+            with open(os.path.join(tmp, "ok.td"), "w") as f:
+                f.write('def OkDialect : Dialect<"ok"> {}\n')
+            _git(tmp, "add", "-A")
+            _git(tmp, "commit", "-qm", "x")
+            idx = Indexer(tmp)
+            idx.build(full=True)
+            diags = idx.store.db.execute("SELECT COUNT(*) FROM diagnostics").fetchone()[0]
+            ok = idx.store.db.execute("SELECT COUNT(*) FROM nodes WHERE kind='dialect'"
+                                      ).fetchone()[0]
+            idx.close()
+            self.assertGreaterEqual(diags, 0)
+            self.assertEqual(ok, 1)  # indexing continued
+        finally:
+            shutil.rmtree(tmp)
+
+
+class EmptyRepoTest(unittest.TestCase):
+    def test_queries_on_fresh_repo(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            _git(tmp, "init", "-q")
+            svc = QueryService(tmp)
+            st = svc.repo_status()
+            self.assertEqual(st["entity_counts"], {})
+            self.assertEqual(svc.get_pass("nope").get("error"), "not found")
+            self.assertEqual(svc.get_tests("nope")["tests"], [])
+            svc.close()
+        finally:
+            shutil.rmtree(tmp)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

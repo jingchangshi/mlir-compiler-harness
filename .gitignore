@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# machine-generated index (RepoMap machine facts, never commit)
+.mlir-repomap/
+examples/ascendnpu-ir/.mlir-repomap/
+
+# fixture build artifacts
+repomap/tests/fixtures/*/.mlir-repomap/
