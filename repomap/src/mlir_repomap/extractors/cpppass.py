@@ -163,13 +163,16 @@ def extract(relpath, text):
         nm = m.group(1)
         ln = line_of(m.start())
         attr_hits.setdefault(nm, ln)
-    ROLES = (("align", "stride"), "memory alignment contract"), \
-            (("core_type", "coretype", "tcore"), "core-type assignment"), \
-            (("annotation",), "annotation carrier"), \
-            (("storage_aligned",), "storage-alignment marker"), \
-            (("vector_function", "vf"), "vector-function marker"), \
-            ("layout", "layout contract"), \
-            ("tiling", "tiling contract"),             ("sync", "synchronization contract")
+    ROLES = (
+        (("align", "stride"), "memory alignment contract"),
+        (("core_type", "coretype", "tcore"), "core-type assignment"),
+        (("annotation",), "annotation carrier"),
+        (("storage_aligned",), "storage-alignment marker"),
+        (("vector_function", "vf"), "vector-function marker"),
+        (("layout", "layout",), "layout contract"),
+        (("tiling", "tile"), "tiling contract"),
+        (("sync", "barrier"), "synchronization contract"),
+    )
     def _role(nm):
         low = nm.lower()
         for keys, role in ROLES:

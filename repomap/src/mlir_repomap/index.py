@@ -350,7 +350,7 @@ class Indexer:
                                 pas, d, '%"' + via + '"%'))
 
         for kind in ("PASS_USES_PATTERN", "PASS_USES_PATTERN_POPULATOR",
-                     "DIALECT_TRANSITIONS_TO"):
+                     "DIALECT_TRANSITIONS_TO", "CREATES_ATTRIBUTE"):
             for eid, src in db.execute(
                     f"SELECT edge_id, src FROM edges WHERE kind='{kind}' "
                     "AND src LIKE 'pass_class:%'").fetchall():
@@ -375,9 +375,26 @@ class Indexer:
                         db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
                     continue
                 if disamb:
-                    db.execute("UPDATE edges SET props=json_set(props,"
-                               "'$.disambiguation',?) WHERE edge_id=?",
-                               (disamb, eid))
+                    # props change can collide with a persisted twin that already
+                    # carries the disambiguation flag: merge instead of update
+                    newp = db.execute(
+                        "SELECT json_set(props,'$.disambiguation',?) FROM edges "
+                        "WHERE edge_id=?", (disamb, eid)).fetchone()[0]
+                    twin = db.execute(
+                        "SELECT edge_id FROM edges WHERE src=? AND dst=? AND "
+                        "kind=? AND props=? AND edge_id<>?",
+                        (tgt, db.execute("SELECT dst FROM edges WHERE edge_id=?",
+                                         (eid,)).fetchone()[0],
+                         db.execute("SELECT kind FROM edges WHERE edge_id=?",
+                                    (eid,)).fetchone()[0], newp, eid)).fetchone()
+                    if twin:
+                        db.execute("UPDATE evidence SET edge_id=? WHERE edge_id=?",
+                                   (twin[0], eid))
+                        db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+                    else:
+                        db.execute("UPDATE edges SET props=json_set(props,"
+                                   "'$.disambiguation',?) WHERE edge_id=?",
+                                   (disamb, eid))
         # binding markers: BINDING_MAPS_TO -> function ids; PYTHON_COMPOSES -> bindings;
         # then expose passes through bindings (Python -> binding -> factory -> pass)
         binding_defs = {}

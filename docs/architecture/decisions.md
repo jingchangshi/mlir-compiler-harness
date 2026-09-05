@@ -245,3 +245,24 @@ Evidence: docs/validation/phase10/ — triton-to-annotation's TritonAscend→Ann
 transition fully evidenced; both repos rebuilt; no regressions.
 Consequences: EG-2 closed; the boundary question is answerable per pass; external-dialect
 outputs (cross-repo boundaries) remain the known limit (QG-7).
+
+## ADR-016 supplement (2026-09-05) — Refined Phase 10 review answers
+
+1. **Dialect transition belongs in the generic schema** — validated on both repos with
+   zero repo-specific naming; confirmed via ConversionTarget idiom, inferred via pattern
+   op ownership. No `DialectTransition` entity needed; the edge + query-time pairs are
+   sufficient.
+2. **Attribute semantic contract does NOT need an independent entity** — the role is a
+   heuristic annotation on the attribute node + producer/consumer edges; an entity per
+   contract would duplicate the attribute itself. Keyword table bug found and fixed
+   during refinement (character-iteration false positives made
+   RegisterTreeReductionSelectedAttr claim a wrong role; now honestly `unknown` — agent
+   reasoning completes it, as the AV2 dossier demonstrates).
+3. **Semantic relations still not deterministic**: attribute *creator vs consumer*
+   intent (RG-1), cross-repo output dialects (QG-7), template-pattern matched ops
+   (triton-to-linalg canonicalizers), type-conversion-driven transitions (no type
+   graph). None blocked the phase's workflows.
+4. **Next phase**: continued evidence-based order — EG-1 remainder (Python stage lists
+   as first-class pipeline nodes), RG-1, QG-7. Attribute value semantics (A) stays
+   deferred: the role layer proved sufficient for the dossiers; runtime contract graph
+   (B), clangd (C), MCP (D) unchanged (no blocking evidence).

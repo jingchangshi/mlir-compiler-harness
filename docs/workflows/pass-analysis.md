@@ -56,7 +56,10 @@ query would have answered it (feeds the query-API review).
    rely on (successor passes + their input handling).
 
 7a. **Semantic boundary analysis** — run `mlir-repomap boundary <pass>` and answer:
-    *what abstraction changes here?* — input dialects, output dialects, created ops,
+    *what abstraction changes here?* and **why does this pass exist at this layer?**
+    (the layer justification combines the boundary with the pipeline-builder context of
+    step 3: the pass exists at this layer because the stage list placed it there, and
+    the boundary says what that placement achieves) — input dialects, output dialects, created ops,
     downstream assumptions, and the dialect→dialect transition pairs. A pass with
     transitions is a lowering boundary and the dossier must say so explicitly
     ("this pass is a lowering boundary because: input dialect …, output dialect …,

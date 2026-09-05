@@ -30,7 +30,7 @@ Question of the phase: **can we understand compiler semantic boundaries?**
 | target | result |
 |---|---|
 | triton-to-annotation | input `TritonAscend` (inferred) → output `Annotation` (**confirmed**, TritonToAnnotation.cpp:64); transition pair derived; boundary names the attribute-payload contract |
-| triton-to-linalg | input `Triton` (inferred via matched ops); output side = external-dialect handoff (honest: Linalg td lives outside the corpus) — dossier states the boundary explicitly |
+| triton-to-linalg | no indexed transitions: its canonicalization patterns are templates (no MATCHES_OP edges) and created linalg ops are external-dialect (td outside corpus, QG-7); the boundary is stated in the dossier from the handoff evidence — honest empty result |
 | AscendNPU-IR StrideAlignDimsAttr | role "memory alignment contract" (heuristic), 3 producers / 9 consumers |
 | AscendNPU-IR TFuncCoreTypeAttr | role "core-type assignment" (heuristic), 6 producers / 20 consumers |
 | AutoVectorizeV2 (RegisterTreeReductionSelectedAttr) | no keyword role — dossier documents the strategy-marker role by agent reasoning (intended division of labor) |
