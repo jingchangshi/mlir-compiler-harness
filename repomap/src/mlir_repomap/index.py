@@ -175,7 +175,12 @@ class Indexer:
         for name in [r[0] for r in db.execute(
                 "SELECT name FROM nodes WHERE kind='factory'")]:
             mid = name[len("create"):-len("Pass")] if name.startswith("create") else name
-            for cand in (mid, mid + "Pass"):
+            # upstream-MLIR idiom: td class carries a dialect prefix with no
+            # `let constructor` (e.g. TritonGPUAccelerateMatmul / createAccelerateMatmulPass)
+            cand_classes = [mid, mid + "Pass"]
+            cand_classes += [c for c in class_to_pass
+                             if c.endswith(mid) and c != mid + "Pass"]
+            for cand in cand_classes:
                 if cand in class_to_pass:
                     fac_to_pass[f"factory:{name}"] = class_to_pass[cand]
                     break

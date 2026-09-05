@@ -1,17 +1,21 @@
 # Roadmap
 
-done: Phase 0-7 (contract, engine, validation, workflows, adapters, deep validation,
-provenance graph, provenance-aware workflows; ADR-001..013).
+done: Phase 0-8 (contract, engine, validation, workflows, adapters, deep validation,
+provenance graph, provenance-aware workflows, Ascend ecosystem validation; ADR-001..014).
+Repos validated: AscendNPU-IR (baseline), triton-ascend.
 
 current: none.
 
-next (based on Phase 7 evidence):
-1. **Second MLIR repository validation** (recommended next): Phase 7 proved the workflow
-   layer on AscendNPU-IR; the untested risk is AscendNPU-IR-shaped extraction. A second
-   repo (e.g. an upstream-MLIR-based compiler or triton fork) would exercise the generic
-   core against different idioms — the same move that made Phases 2/5 decisive here.
-2. **RG-1 attribute-creator tracing** (small): marker-construction call-site extractor
-   (setAttr/createAlignMarkOp paths) to upgrade CREATES_ATTRIBUTE beyond inferred.
+next (based on Phase 8 evidence):
+1. **EG-3 Python pipeline-composition extractor** (recommended next): ADD_PASS_WRAPPER
+   bindings + Python stage lists — unlocks pipeline provenance for the entire Triton
+   ecosystem side and connects triton-ascend's upstream path.
+2. **EG-1 fix** (small): stop classifying runOnOperation bodies as pipeline builders.
+3. **RG-1 attribute-creator tracing**: marker-construction call sites (upgrades
+   CREATES_ATTRIBUTE beyond inferred; benefits both repos).
+
+deferred: MCP, clangd, EG-5 gtest coverage, cross-repo handoff edges (QG-7) — none
+blocking; revisit after EG-3.
 
 deferred (unchanged): MCP — no hot-path pressure through Phase 7; clangd — no wrong-fact
 incident through Phase 7; attribute value semantics — RG-1 does not require it yet.

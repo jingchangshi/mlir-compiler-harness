@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–7 complete)
+Updated: 2026-09-05 (Phases 0–8 complete)
 
 ## Implemented
 
@@ -51,10 +51,17 @@ remains (`populate*` chasing) and did not block the workflows.
   (pattern-map.md, attribute-map.md); regbase audit re-run with builder chains and swap
   outcomes; no new query type needed.
 
+- Phase 8 Ascend ecosystem validation (ADR-014, `docs/validation/phase8/`): harness
+  migrated to triton-ascend (1255 files, 11 s, 0 diagnostics); six architecture docs
+  generated; 3 pass dossiers incl. the upstream-idiom probe; 2 generic fixes (bare
+  generated-base EG-4, factory suffix matching); gaps EG-1/3/5 recorded with designs.
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
   is name-level (no per-op attachment).
+- Triton-ecosystem gaps: Python-composed pipelines invisible (EG-3), runOnOperation
+  pipeline mislabel (EG-1), gtest coverage not extracted (EG-5) — designs recorded.
 - Pipeline detection is signature-based; some entry functions (e.g. `runRegBaseCompile`) missed.
 - Op extraction covers direct defs and one-level multiclass aliases.
 - Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).

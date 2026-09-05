@@ -6,7 +6,7 @@ from .. import model
 RE_PASS_CLASS = re.compile(
     r'\b(?:struct|class)\s+(\w+)\s*(?::[^{;]*)?\b(?:public\s+)?'
     r'(?:PassWrapper\s*<\s*\w+\s*,\s*(?:OperationPass|Pass)|'
-    r'OperationPass|PassWrapper|PassInfoMixin|impl\s*::\s*(\w+Base)|Pass)\s*<')
+    r'OperationPass|PassWrapper|PassInfoMixin|(?:impl\s*::\s*)?(\w+Base)|Pass)\s*<')
 RE_GETARG = re.compile(
     r'StringRef\s+getArgument\(\)\s*const\s*(?:override)?\s*{\s*return\s*"([^"]+)"')
 RE_FACTORY_DEF = re.compile(
