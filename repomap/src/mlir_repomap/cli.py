@@ -1,6 +1,7 @@
 """Thin CLI frontend over QueryService (ADR-004: no business logic here)."""
 import argparse
 import json
+import os
 import sys
 
 
@@ -29,6 +30,10 @@ def main(argv=None):
     p = sub.add_parser("pipeline-builder"); p.add_argument("name")
     p = sub.add_parser("attribute"); p.add_argument("name")
     p = sub.add_parser("pipeline-composition"); p.add_argument("name")
+    eco = sub.add_parser("ecosystem")
+    eco.add_argument("--repos", action="append", required=True)
+    eco.add_argument("query", choices=["status", "handoff", "boundary", "contract"])
+    eco.add_argument("name", nargs="?")
     p = sub.add_parser("dialect-transition"); p.add_argument("name")
     p = sub.add_parser("semantic-contract"); p.add_argument("name")
     p = sub.add_parser("boundary"); p.add_argument("name")
@@ -36,6 +41,27 @@ def main(argv=None):
 
     args = ap.parse_args(argv)
     root = args.repo
+
+    if args.cmd == "ecosystem":
+        from .ecosystem import EcosystemQueryService
+        eco = EcosystemQueryService(args.repos)
+        try:
+            q = args.query
+            if q == "status":
+                result = eco.status()
+            elif q == "handoff":
+                result = {"handoffs": eco.dialect_handoffs(args.name)
+                          + eco.op_handoffs(args.name)}
+            elif q == "boundary":
+                result = eco.repository_boundary(
+                    args.name or os.path.basename(os.path.abspath(args.repos[0])))
+            else:
+                result = {"contracts": eco.cross_repo_contracts(args.name)}
+        finally:
+            eco.close()
+        print(json.dumps({"command": "ecosystem", "result": result},
+                         indent=1, default=str))
+        return 0
 
     if args.cmd == "index":
         idx = index_mod.Indexer(root)
@@ -67,6 +93,8 @@ def main(argv=None):
         result = fn()
     finally:
         svc.close()
+
+
 
     stale = None
     svc2 = QueryService(root)

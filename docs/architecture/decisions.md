@@ -266,3 +266,23 @@ outputs (cross-repo boundaries) remain the known limit (QG-7).
    as first-class pipeline nodes), RG-1, QG-7. Attribute value semantics (A) stays
    deferred: the role layer proved sufficient for the dossiers; runtime contract graph
    (B), clangd (C), MCP (D) unchanged (no blocking evidence).
+
+## ADR-017 (2026-09-05, accepted) — Ecosystem layer: cross-repository handoff without touching per-repo graphs
+
+Context: Phase 10 left cross-repo boundaries (QG-7) unresolved; the Ascend stack spans
+triton-ascend (producer of HIVM/HFusion/Annotation inputs... consumer of their dialects)
+and AscendNPU-IR (definer of those dialects/ops).
+Decision: keep per-repo indexes authoritative and self-contained; add a generic
+**ecosystem layer** that opens N indexes and derives handoff records by artifact-name
+matching: (1) dialect handoff = consumer's DIALECT_TRANSITIONS_TO output dialect defined
+in another repo (confirmed, ConversionTarget evidence); (2) operation handoff = consumer's
+PATTERN_CREATES_OP op defined+owned in another repo (confirmed; op index keyed by both
+TableGen class name and mnemonic — the name/mnemonic mismatch was found and fixed during
+validation); (3) cross-repo attribute contracts by dual-repo references. Repository
+identity is the index path; no repo names in the engine. Exposed as
+`mlir-repomap ecosystem --repos … <status|handoff|boundary|contract>`.
+Evidence: docs/validation/phase11/ — 2 confirmed dialect handoffs (Annotation, HIVM),
+10 op handoffs (MarkOp→Annotation, AtomicRMWOp→HIVM, Conv*/Histogram→HFusion, ...),
+5 cross-repo attribute contracts, complete triton-ascend boundary view.
+Consequences: QG-7 closed at the ecosystem level; handoff matching is name-based
+(versioned artifact identity remains open); runtime-level handoffs out of scope.

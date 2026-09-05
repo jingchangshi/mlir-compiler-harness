@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–10 complete)
+Updated: 2026-09-05 (Phases 0–11 complete)
 
 ## Implemented
 
@@ -67,6 +67,11 @@ remains (`populate*` chasing) and did not block the workflows.
   DIALECT_TRANSITIONS_TO edges (ConversionTarget-confirmed + pattern-ownership-inferred),
   attribute semantic roles (heuristic keyword table), boundary/dialect-transition/
   semantic-contract queries, workflow steps 7a + lens 1a; EG-2 closed.
+
+- Phase 11 ecosystem handoff graph (ADR-017, `docs/validation/phase11/`): ecosystem
+  layer derives dialect/op/attribute handoffs across the two repo indexes; 2 confirmed
+  dialect handoffs (Annotation, HIVM), 10 op handoffs, 5 shared attribute contracts;
+  `mlir-repomap ecosystem` query family; QG-7 closed at ecosystem level.
 
 ## Current limitations
 

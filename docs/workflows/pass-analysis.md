@@ -66,6 +66,12 @@ query would have answered it (feeds the query-API review).
     created ops …, downstream assumptions …"); a pass with none is an
     optimization/analysis pass at its position — also state that.
 
+7c. **Cross-repository contract** — if the pass outputs an artifact consumed by another
+    repository in the ecosystem (dialect, op, attribute — visible via
+    `mlir-repomap ecosystem handoff <name>` with `--repos` covering the stack), the
+    dossier must name: producer, consumer, handoff contract, and the transforming pass.
+    Only relevant when an ecosystem index is available; otherwise skip explicitly.
+
 7b. **Pattern provenance** — if the pass registers rewrite patterns (direct or via
    populator chains): for each pattern run `mlir-repomap pattern-owner <Pattern>` and
    document the **ownership path**: Pass → populator function (file:line, call site) →

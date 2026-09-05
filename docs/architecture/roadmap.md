@@ -1,19 +1,19 @@
 # Roadmap
 
-done: Phase 0-10 (contract, engine, validation, workflows, adapters, deep validation,
-provenance graph, provenance-aware workflows, ecosystem validation, cross-language
-provenance, semantic boundary graph; ADR-001..016). Repos: AscendNPU-IR (baseline),
-triton-ascend (C++ + Python hybrid).
+done: Phase 0-11 (…, semantic boundary graph, cross-repository handoff graph;
+ADR-001..017). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer
+over both.
 
 current: none.
 
-next (based on Phase 10 evidence):
-1. **EG-1 remainder — Python pipeline extractor completion**: make_* stage lists as
-   first-class pipeline nodes (composition functions exist; stage-list nodes pending).
-2. **RG-1 attribute-creator tracing**: marker-construction call sites — upgrades
-   CREATES_ATTRIBUTE beyond inferred, strengthens semantic contracts.
-3. **Cross-repo handoff (QG-7)**: external-dialect declarations so triton-to-linalg /
-   triton_to_hivm output sides resolve across the two indexes.
+next (based on Phase 11 evidence):
+1. **EG-1 remainder — Python stage lists as first-class pipeline nodes** (carried).
+2. **RG-1 attribute-creator tracing** — now ecosystem-relevant: the 5 cross-repo
+   attribute contracts would gain confirmed ownership sides.
+3. **Ecosystem persistence + more repos**: persist handoff edges in an ecosystem index
+   and onboard a third Ascend repo (backend/compiler) when available.
+
+deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
 
 deferred (unchanged): MCP, clangd, attribute value semantics, full interpreter.
 

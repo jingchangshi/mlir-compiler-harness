@@ -39,6 +39,13 @@ plus guard text replaces repository-wide searching.
    by an earlier pass, e.g. `decomposePhase = AFTER_<X>` consumed by a later pass) with no
    verifier. Justifications must reference the builder insertion site from the provenance
    chain, not just the extracted order.
+1z. **Ecosystem boundary lens** — when the pipeline's final stages produce IR for
+   another compiler repository (visible via
+   `mlir-repomap ecosystem handoff --repos <stack repos>`), record the handoff:
+   repository pipeline → external compiler stage → next repository, with the consuming
+   passes. State which contracts (dialects, ops, attributes) cross the boundary and who
+   owns them.
+
 1a. **Dialect-transition lens** — for the pipeline's stages, run
    `mlir-repomap dialect-transition <pass>` (or `boundary`) and assemble the dialect
    evolution: pipeline stage → dialect transitions → hardware boundary. Mark the stage

@@ -2,6 +2,14 @@
 
 Storage: SQLite (`.mlir-repomap/index.db`) + JSON metadata.
 
+Cross-repository handoff (ADR-017, Phase 11): per-repo indexes are unchanged; the
+**ecosystem layer** (`ecosystem.py`, `mlir-repomap ecosystem --repos A --repos B`)
+derives handoff records by matching artifacts by name across indexes — dialect handoff
+(consumer's DIALECT_TRANSITIONS_TO vs producer's dialect definitions), operation handoff
+(consumer's PATTERN_CREATES_OP vs producer's op definitions, keyed by class name and
+mnemonic), and cross-repo attribute contracts (name referenced in both). Repository
+identity is the index path (display name = basename) — never a semantic name.
+
 Pipeline identity (ADR-012): node id is `pipeline:<file>:<name>` — same-name builders in
 different files never merge (AscendNPU-IR's dual `alignStoragePipeline` is the validated
 case). Queries by bare name return the unique match or an explicit ambiguity error with
