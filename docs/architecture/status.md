@@ -128,13 +128,21 @@ remains (`populate*` chasing) and did not block the workflows.
   semantic extraction for Python-composed pipeline stage order; no large architecture
   was implemented.
 
+- Phase 19 Python pipeline semantic provenance (ADR-024,
+  `docs/validation/phase19/`): AST-confirmed Python composition functions are now
+  file-qualified pipeline nodes with `PIPELINE_COMPOSED_BY`, ordered stage edges and
+  `pipeline-stages`. Static binding names resolve through the existing C++ boundary only;
+  unresolved names are diagnostics. triton-ascend validates `make_ttir` and
+  `ttir_to_linalg` (15 ordered stages; triton-to-linalg at order 12); the checked-out
+  version's absent `make_ttgir` is an explicit not-found result. C++ pipeline regression
+  remains clean; tests cover direct/list/binding/ambiguity/missing-evidence cases.
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
   is name-level (no per-op attachment).
-- Python-composition provenance resolves Python → binding → factory → pass, but Python
-  stage lists are not first-class `pipeline` nodes; full order/guard auditing still
-  requires source or a dossier.
+- Python pipeline stage order is AST-static only: runtime branches, arbitrary list/dataflow,
+  dynamic imports and semantic execution are deliberately outside the graph.
 - Pipeline detection is signature-based; some entry functions (e.g. `runRegBaseCompile`) missed.
 - Op extraction covers direct defs and one-level multiclass aliases.
 - Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).

@@ -226,7 +226,7 @@ class QueryService:
             if node is None:
                 # fall through to name-based resolution on the bare name
                 name = name.rsplit(":", 1)[-1]
-        else:
+        if node is None:
             exact = [p for p in self.store.nodes_by_kind(model.PIPELINE)
                      if p["name"] == name]
             if len(exact) == 1:
@@ -249,6 +249,8 @@ class QueryService:
             stage = {"pass": e["dst"], "order": e["props"].get("order"),
                      "seq": e["props"].get("seq"),
                      "scope": e["props"].get("scope"),
+                     "origin": e["props"].get("origin"),
+                     "stage_kind": e["props"].get("stage_kind"),
                      "nested": e["props"].get("nested", False),
                      "condition": e["props"].get("condition"),
                      "confidence": e["confidence"]}
@@ -260,8 +262,45 @@ class QueryService:
         subs = [e["dst"] for e in self.store.edges_from(nid, model.PIPELINE_CALLS)]
         callers = [e["src"] for e in self.store.edges_to(nid, model.PIPELINE_CALLS)]
         tests = self.get_tests(node["name"]).get("tests", [])
+        composed = self._evidence_summary(
+            self.store.edges_from(nid, model.PIPELINE_COMPOSED_BY))
         return {"pipeline": node, "stages": stages, "sub_pipelines": subs,
-                "called_by": callers, "tests": tests}
+                "called_by": callers, "tests": tests,
+                "composed_by": composed}
+
+    def pipeline_stages(self, name):
+        """Ordered, evidence-backed stages of a Python composition pipeline.
+
+        This is a presentation query over deterministic ``PIPELINE_CONTAINS``
+        edges.  It never infers a stage from runtime behavior; unresolved AST
+        names remain visible along with a diagnostic.
+        """
+        result = self.get_pipeline(name, brief=False)
+        if "error" in result:
+            return result
+        owners = result.get("composed_by") or []
+        if not owners:
+            return {"error": "not a Python composition pipeline",
+                    "pipeline": result["pipeline"]}
+        diagnostics, stages = [], []
+        for stage in result["stages"]:
+            target = stage["pass"]
+            node = self._node_or_none(target)
+            item = {"order": stage["order"], "stage": target,
+                    "node": node, "scope": stage.get("scope"),
+                    "origin": stage.get("origin"),
+                    "confidence": stage["confidence"],
+                    "evidence": stage.get("evidence", [])}
+            if target.startswith(("binding:NAME:", "pass:NAME:")):
+                item["diagnostic"] = "unresolved static stage name"
+                diagnostics.append(f"unresolved stage at order {stage['order']}: {target}")
+            stages.append(item)
+        return {"pipeline": result["pipeline"], "python_owner": [
+                    {"function": e["dst"], "node": self._node_or_none(e["dst"]),
+                     "evidence": e["evidence"], "confidence": e["confidence"]}
+                    for e in owners],
+                "stages": stages, "cxx_pipeline_calls": result["sub_pipelines"],
+                "diagnostics": diagnostics}
 
     def find_symbol(self, name):
         return {"symbols": self.store.search_nodes(name)}

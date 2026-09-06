@@ -456,6 +456,61 @@ class Indexer:
                            "VALUES (?,?,?,?)",
                            (bid, tgt, "BINDING_EXPOSES_PASS", "{}"))
 
+        # Python pipeline stages start as deterministic name markers.  Resolve
+        # a binding marker only when its C++ boundary exposes exactly one pass;
+        # unresolved markers are intentionally retained for query diagnostics.
+        binding_to_pass = {}
+        for bid, pas in db.execute(
+                "SELECT src, dst FROM edges WHERE kind='BINDING_EXPOSES_PASS'"):
+            binding_to_pass.setdefault(bid.split(":", 1)[-1], []).append(pas)
+        pass_by_name = {}
+        for pas, name in db.execute("SELECT id, name FROM nodes WHERE kind='pass'"):
+            pass_by_name.setdefault(name, []).append(pas)
+
+        def resolve_python_stage_marker(value):
+            if value.startswith("binding:NAME:"):
+                ids = binding_to_pass.get(value.split("binding:NAME:", 1)[-1], [])
+                return ids[0] if len(ids) == 1 else value
+            if value.startswith("pass:NAME:"):
+                ids = pass_by_name.get(value.split("pass:NAME:", 1)[-1], [])
+                return ids[0] if len(ids) == 1 else value
+            return value
+
+        for eid, src_, dst in db.execute(
+                "SELECT edge_id, src, dst FROM edges "
+                "WHERE kind IN ('PIPELINE_CONTAINS','PRECEDES')").fetchall():
+            new_src, new_dst = (resolve_python_stage_marker(src_),
+                                resolve_python_stage_marker(dst))
+            if (new_src, new_dst) != (src_, dst):
+                try:
+                    db.execute("UPDATE edges SET src=?, dst=? WHERE edge_id=?",
+                               (new_src, new_dst, eid))
+                except sqlite3.IntegrityError:
+                    # Same relation can be reached through a list and a binding
+                    # spelling; keep the existing evidence rather than inventing
+                    # a second fact.
+                    db.execute("DELETE FROM evidence WHERE edge_id=?", (eid,))
+                    db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+
+        # Pattern C (ADR-024): a Python ``make_*`` binding can expose a C++
+        # pipeline builder. Resolve only an unambiguous binding -> function ->
+        # PIPELINE_BUILT_BY chain; otherwise leave the marker as evidence of
+        # the static call rather than claiming a pipeline association.
+        binding_to_pipeline = {}
+        for bid, fnid in binding_defs.items():
+            ids = [row[0] for row in db.execute(
+                "SELECT src FROM edges WHERE kind='PIPELINE_BUILT_BY' AND dst=?",
+                (fnid,))]
+            if len(ids) == 1:
+                binding_to_pipeline[bid.split(":", 1)[-1]] = ids[0]
+        for eid, dst in db.execute(
+                "SELECT edge_id, dst FROM edges WHERE kind='PIPELINE_CALLS' "
+                "AND dst LIKE 'binding:NAME:%'").fetchall():
+            name = dst.split("binding:NAME:", 1)[-1]
+            pid = binding_to_pipeline.get(name)
+            if pid:
+                db.execute("UPDATE edges SET dst=? WHERE edge_id=?", (pid, eid))
+
         # resolve cross-file populator call markers to function ids (QG-3)
         func_names = {}
         for fid, nm in db.execute("SELECT id, name FROM nodes WHERE kind='function'"):

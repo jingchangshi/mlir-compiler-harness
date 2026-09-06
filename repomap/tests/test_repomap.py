@@ -226,6 +226,97 @@ class FixtureTest(unittest.TestCase):
             shutil.rmtree(tmp)
 
 
+class PythonPipelineTest(unittest.TestCase):
+    """Phase 19: deterministic Python pipeline entity and provenance."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = tempfile.mkdtemp()
+        os.makedirs(os.path.join(cls.repo, "lib"))
+        files = {
+            "Passes.td": '''def SimpleFold : Pass<"simple-fold"> {
+  let constructor = "createSimpleFoldPass()";
+}
+''',
+            "lib/Bindings.cpp": '''void bindPythonPipeline(py::module &m) {
+  m.def("add_simple_fold", [](PassManager &pm) {
+    pm.addPass(createSimpleFoldPass());
+  });
+  m.def("make_build_bridge", [](PassManager &pm) {
+    buildBridgePipeline(pm);
+  });
+}
+void buildBridgePipeline(OpPassManager &pm) {
+  pm.addPass(createSimpleFoldPass());
+}
+''',
+            "python_pipeline.py": '''def make_ttgir(pm):
+    passes.ttir.add_simple_fold(pm)
+    pm.add_pass(createSimpleFoldPass())
+
+def list_pipeline(pm):
+    pipeline = [createSimpleFoldPass(), missing_stage]
+    for stage in pipeline:
+        pm.add_pass(stage)
+
+def build_via_cxx(pm):
+    make_build_bridge(pm)
+''',
+            "python_pipeline_alt.py": '''def make_ttgir(pm):
+    pm.add_pass(createSimpleFoldPass())
+''',
+        }
+        for rel, content in files.items():
+            with open(os.path.join(cls.repo, rel), "w") as fh:
+                fh.write(content)
+        _git(cls.repo, "init", "-q")
+        _git(cls.repo, "add", "-A")
+        _git(cls.repo, "commit", "-qm", "python pipeline fixture")
+        idx = Indexer(cls.repo)
+        idx.build(full=True)
+        idx.close()
+        cls.svc = QueryService(cls.repo)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.svc.close()
+        shutil.rmtree(cls.repo)
+
+    def test_python_ast_stages_are_ordered_and_evidenced(self):
+        result = self.svc.pipeline_stages(
+            "pipeline:python_pipeline.py:make_ttgir")
+        self.assertNotIn("error", result)
+        self.assertEqual(result["python_owner"][0]["function"],
+                         "function:python_pipeline.py:make_ttgir")
+        self.assertEqual([stage["order"] for stage in result["stages"]], [1, 2])
+        self.assertEqual([stage["stage"] for stage in result["stages"]],
+                         ["pass:simple-fold", "pass:simple-fold"])
+        self.assertTrue(all(stage["evidence"] for stage in result["stages"]))
+
+    def test_python_list_pipeline_reports_missing_stage_evidence(self):
+        result = self.svc.pipeline_stages(
+            "pipeline:python_pipeline.py:list_pipeline")
+        self.assertEqual([stage["stage"] for stage in result["stages"]],
+                         ["pass:simple-fold", "pass:NAME:missing_stage"])
+        self.assertEqual(len(result["diagnostics"]), 1)
+        self.assertIn("missing_stage", result["diagnostics"][0])
+
+    def test_python_binding_call_associates_cxx_pipeline(self):
+        result = self.svc.pipeline_stages(
+            "pipeline:python_pipeline.py:build_via_cxx")
+        self.assertEqual(result["stages"], [])
+        self.assertEqual(result["cxx_pipeline_calls"],
+                         ["pipeline:lib/Bindings.cpp:buildBridgePipeline"])
+
+    def test_python_pipeline_name_ambiguity_is_explicit(self):
+        result = self.svc.pipeline_stages("make_ttgir")
+        self.assertEqual(result.get("error"), "ambiguous")
+
+    def test_missing_file_qualified_pipeline_falls_back_to_explicit_ambiguity(self):
+        result = self.svc.pipeline_stages("pipeline:missing.py:make_ttgir")
+        self.assertEqual(result.get("error"), "ambiguous")
+
+
 class EmptyRepoTest(unittest.TestCase):
     def test_queries_on_fresh_repo(self):
         tmp = tempfile.mkdtemp()

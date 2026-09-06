@@ -458,3 +458,30 @@ MergeVecScope returns the unguarded single-use assumption (record) + verify guar
 with fa682a1a3 as recent history; tests 42/42.
 Consequences: no schema change, no INDEXER_VERSION bump; query-api gains `review` and
 the extended `evidence` catalog; workflows consume them (pass-analysis step 0, lens 1g).
+
+## ADR-024 (2026-09-06, accepted) — Python pipeline semantic provenance: AST stages, not execution
+
+Context: Phase 18 showed that Python composition could explain a single pass's binding
+chain, but could not be queried as an ordered pipeline. That blocked a pipeline audit of
+the actual Python orchestration layer.
+Decision: (1) a qualifying Python function is also a file-qualified `pipeline` node when
+its AST constructs a pass manager and has `pm.add_pass`, `add_*(pm, ...)`, an ordered
+`pipeline`/`stages` list, or a static `make_*` C++-binding call; (2) the pipeline has a
+confirmed `PIPELINE_COMPOSED_BY` edge to the Python function and ordered
+`PIPELINE_CONTAINS`/`PRECEDES` edges whose evidence is the AST call/list line; (3) binding
+stage names resolve to a pass only through the existing confirmed C++ binding boundary;
+a name that cannot be resolved remains a query diagnostic; (4) a `make_*` binding resolves
+to a C++ pipeline only through one unambiguous binding → C++ function →
+`PIPELINE_BUILT_BY` chain. `pipeline-stages` presents this model.
+Rejected: runtime interpreter/tracing (configuration/runtime-dependent rather than source
+fact); semantic execution or LLM inference (reasoning, not graph fact); cross-repository
+validation (still a doc/evolution-layer concern). A Python list named `pipeline`/`stages`
+is deliberately limited to static list order; loop execution and arbitrary dataflow are
+not inferred.
+Evidence: `docs/validation/phase19/` — AST fixtures cover direct add, ordered list,
+binding-to-C++ association, ambiguity and missing evidence; triton-ascend exposes real
+`make_ttir` and `ttir_to_linalg` stage order. The checked-out version has no
+`make_ttgir`, which is recorded as a source-version fact rather than guessed.
+Consequences: INDEXER_VERSION 48 forces a full re-index; C++ pipeline behavior remains
+unchanged, and both graph/review/finding ownership boundaries from ADR-019..023 remain
+intact.

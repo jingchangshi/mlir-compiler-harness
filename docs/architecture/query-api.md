@@ -24,6 +24,7 @@ to re-index; workflows must refresh before reasoning if stale).
 | `pass <name>` | get_pass(name) | full dossier (below). `<name>` may be the pass arg, td class, cpp class, or factory name; case-insensitive. Multiple candidates return `{"error":"ambiguous","candidates":[...]}` — callers must ask, never guess |
 | `pipelines` | pipelines() | pipeline list w/ entry file, pass count |
 | `pipeline <name> [--brief]` | get_pipeline(name, brief) | ordered stages incl. conditions, nested scopes, called sub-pipelines. `--brief` omits per-stage evidence rows (stage-level evidence remains available via the `evidence` command) |
+| `pipeline-stages <pipeline>` | pipeline_stages(name) | Python pipeline view: AST-confirmed owner, ordered stages with file:line evidence, C++ pipeline calls, and explicit unresolved-static-name diagnostics; C++ pipelines return `not a Python composition pipeline` |
 | `symbol <name>` | find_symbol(name) | matching entities (class/function/op/pattern) + def evidence |
 | `references <name>` | get_references(name) | edges/mentions of the entity grouped by kind |
 | `tests <pass-or-pipeline>` | get_tests(name) | covering tests w/ RUN lines + confidence |

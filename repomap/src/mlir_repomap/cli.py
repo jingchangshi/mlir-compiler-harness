@@ -38,6 +38,7 @@ def main(argv=None):
     p = sub.add_parser("pass"); p.add_argument("name")
     sub.add_parser("pipelines")
     p = sub.add_parser("pipeline"); p.add_argument("name"); p.add_argument("--brief", action="store_true")
+    p = sub.add_parser("pipeline-stages"); p.add_argument("name")
     p = sub.add_parser("symbol"); p.add_argument("name")
     p = sub.add_parser("references"); p.add_argument("name")
     p = sub.add_parser("tests"); p.add_argument("name")
@@ -175,6 +176,7 @@ def main(argv=None):
               "dialects": svc.dialects,
               "passes": lambda: svc.passes(args.query), "pass": lambda: svc.get_pass(args.name),
               "pipelines": svc.pipelines, "pipeline": lambda: svc.get_pipeline(args.name, brief=args.brief),
+              "pipeline-stages": lambda: svc.pipeline_stages(args.name),
               "symbol": lambda: svc.find_symbol(args.name),
               "references": lambda: svc.get_references(args.name),
               "tests": lambda: svc.get_tests(args.name),

@@ -217,6 +217,19 @@ def extract(relpath, text):
                               "dst": f"factory:create{fm.group(1)}",
                               "kind": model.BINDING_MAPS_TO, "props": {"via": "lambda"},
                               "evidence": ev(ln, ln + seg.count("\n"))})
+            else:
+                # A binding can expose a C++ pipeline builder rather than a
+                # pass factory. Keep the exact function name for Phase 19's
+                # Python composition -> C++ pipeline resolution.
+                cm = next((candidate for candidate in re.finditer(
+                    r'\b([A-Za-z_]\w*)\s*\(', seg)
+                    if candidate.group(1) not in {"addPass", "addNestedPass"}), None)
+                if cm:
+                    edges.append({"src": f"binding:{bind}",
+                                  "dst": f"function:NAME:{cm.group(1)}",
+                                  "kind": model.BINDING_MAPS_TO,
+                                  "props": {"via": "lambda"},
+                                  "evidence": ev(ln, ln + seg.count("\n"))})
             continue
         # direct function-reference form: m.def("name", createXPass)
         fm = re.search(r'"\s*,\s*([A-Za-z:][\w:]*)', text[m.end():m.end() + 200])

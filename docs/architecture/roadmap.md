@@ -1,27 +1,17 @@
 # Roadmap
 
-已完成：Phase 0–18（ADR-001..023）。Phase 18 在 AscendNPU-IR 与 triton-ascend 执行
-真实索引、pass/pipeline 工作流、finding drift、impact、review memory 与历史 replay；
-结论见 `docs/validation/phase18/`。
+已完成：Phase 0–19（ADR-001..024）。Phase 19 补齐 Python compiler orchestration 的
+一等静态 pipeline provenance：Python AST stage order、binding→C++ builder 的唯一链、
+显式不确定性，以及 `pipeline-stages` 查询。验证见 `docs/validation/phase19/`。
 
-当前：维护已验证的确定性图、文档层 finding 和 review memory；不在图中保存推理、
-review conclusion 或 finding status。
+当前：维护确定性 graph、文档层 review/finding 和 evolution analysis。C++ compiler
+facts、Python compiler orchestration、review memory、evolution analysis 已共同覆盖本
+仓库的目标边界。
 
-下一步仅作证据驱动的评估：
+下一步建议：**stop / maintain**。先在真实 review 中收集 Python AST 的漏报或错误
+事实证据，再重新评估后续工作；目前没有证据支持提前实施 watchlist、MCP、embedding、
+clangd、runtime tracing、runtime contract graph 或 cross-repository validation。
 
-1. **Deeper semantic extraction（Python composed pipeline stage view）**：Phase 18
-   证实 `pipeline-composition` 可解释单个 pass 的 Python→C++ provenance，却不能
-   以 `pipeline` 查询完整 Python stage order、guard 和 swap contract。先验证一个
-   通用表示能否覆盖两个目标仓，再决定是否实现。
-
-仍 deferred：
-
-- watchlist：Phase 18 最新提交检查均为 clean；没有推送机制的真实压力。
-- MCP：CLI 已完成完整工作流，未观察到适配器阻塞。
-- clangd：没有 wrong-fact incident；当前问题是 Python 编排语义而非 C++ 名称解析。
-- runtime contract graph、embedding search、cross-repository contract validation：
-  TTL-001 显示跨仓 evidence 仍需人工判断，但证据不足以承担该架构扩张。
-- attribute value semantics、完整 gtest coverage extraction：维持既有限制记录。
-
-已拒绝：把 finding/review reasoning 写入图、根据 drift 自动改变 finding status、以及
-在没有真实工作流证据时提前启动新方向。
+仍记录的边界：Python runtime branch/动态 import/任意数据流不执行；跨仓 evidence
+仍只报告 uncertainty；attribute value semantics 与完整 gtest coverage extraction 未实现。
+这些都是有意边界，不应通过把 reasoning 写入 graph 或自动改变 finding status 来绕过。

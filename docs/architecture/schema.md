@@ -10,11 +10,11 @@ derives handoff records by matching artifacts by name across indexes — dialect
 mnemonic), and cross-repo attribute contracts (name referenced in both). Repository
 identity is the index path (display name = basename) — never a semantic name.
 
-Pipeline identity (ADR-012): node id is `pipeline:<file>:<name>` — same-name builders in
-different files never merge (AscendNPU-IR's dual `alignStoragePipeline` is the validated
-case). Queries by bare name return the unique match or an explicit ambiguity error with
-file-qualified candidates. `PIPELINE_CONTAINS` edges carry both `order` (per-scope) and
-`seq` (monotonic source order across scopes, QG-6). Schema version field in
+Pipeline identity (ADR-012/024): node id is `pipeline:<file>:<name>` — a pipeline can be
+a C++ builder or an AST-confirmed Python composition function; same-name builders in
+different files never merge. Queries by bare name return the unique match or an explicit
+ambiguity error with file-qualified candidates. `PIPELINE_CONTAINS` edges carry both
+`order` (per-scope) and `seq` (monotonic source order across scopes). Schema version field in
 `meta` table; query API never exposes raw storage, so storage may change freely.
 
 ## Entities (`nodes` table)
@@ -27,7 +27,7 @@ file-qualified candidates. `PIPELINE_CONTAINS` edges carry both `order` (per-sco
 | `pass` | `pass:<arg>` where arg = Pass ctor string arg (e.g. `hivm-fold`) or C++ `getArgument()` | Passes.td `def X : Pass<"arg">`, C++ pass classes |
 | `pass_class` | `cppclass:<Name>` | C++ class deriving PassWrapper/OperationPass |
 | `factory` | `func:<createXxxPass>` | `createXxxPass(` definitions in C++ |
-| `pipeline` | `pipeline:<buildXxxPipeline|runXxx>` | `void buildXxxPipeline(OpPassManager&...)`, `runXxxCompile` |
+| `pipeline` | `pipeline:<file>:<name>` | C++ builder or AST-confirmed Python composition function |
 | `pattern` | `pattern:<CppClass>` | `struct X : OpRewritePattern<FooOp>` etc. |
 | `interface` | `interface:<Name>` | `def X : Interface<...>` in .td |
 | `test` | `test:<repo-relative-path>` | files with `RUN:` lines; `summary` carries heuristic `features:` tags (dynamic-shape, reduction, fusion, vectorization, bufferization, stride-align, nested-region) |
@@ -62,6 +62,7 @@ Directed; `src`/`dst` are node ids. Edge kinds (MVP set):
 | `FUNCTION_DEFINES_PATTERN` | function -> pattern | `patterns.add<X>(...)` inside a pattern-set function | confirmed |
 | `FUNCTION_CALLS` | function -> function | pattern-set helper call chain (populate -> register -> add) | confirmed |
 | `PIPELINE_BUILT_BY` | pipeline -> builder function | pipeline builder definition | confirmed (ADR-012) |
+| `PIPELINE_COMPOSED_BY` | Python pipeline -> Python function | AST function definition | confirmed (ADR-024) |
 | `BINDING_MAPS_TO` | binding -> C++ function/factory | PyBind def / wrapper macro / lambda body factory call | confirmed (ADR-015) |
 | `PYTHON_COMPOSES` | Python composition function -> binding | `passes.<group>.add_*(pm, ...)` stage call inside a composition function | confirmed |
 | `BINDING_EXPOSES_PASS` | binding -> pass | resolved chain binding -> factory -> pass | confirmed (ADR-015) |

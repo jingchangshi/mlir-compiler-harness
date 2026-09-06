@@ -30,6 +30,12 @@ target/configuration each belongs to.
 Then read only the evidence-pointed regions of pipeline builder files. The pipeline graph
 plus guard text replaces repository-wide searching.
 
+For a Python-composed pipeline, replace the C++-only first query with
+`mlir-repomap pipeline-stages <pipeline>`. Record the deterministic chain **Python
+pipeline → composed-by Python function → ordered stage edges → C++ pipeline calls**. Each
+stage must retain its AST `file:line`; an unresolved static name is a diagnostic, not a
+guessed pass. Then audit the resolved C++ stages with the same ordering and review lenses.
+
 ## Audit lenses (each produces findings or explicit "checked, OK")
 
 1. **Ordering dependency + justification** — for each consecutive stage pair, what makes
