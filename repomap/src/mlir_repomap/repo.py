@@ -89,21 +89,45 @@ def changed_vs_head(root):
         if not t:
             i += 1
             continue
-        code, _, name = t.partition(" ")
-        name = name.strip()
-        if code.startswith("R"):
-            old, new = name, tokens[i + 1] if i + 1 < len(tokens) else ""
+        # Porcelain v1 has a fixed two-character XY status followed by a
+        # space and the path.  ``partition(' ')`` loses a leading blank in
+        # ordinary unstaged states (`` M path``), so it silently missed them.
+        code, name = t[:2], t[3:]
+        if "R" in code:
+            # With ``-z``, porcelain v1 emits destination first, then source.
+            new, old = name, tokens[i + 1] if i + 1 < len(tokens) else ""
             result["renamed"].append({"from": old, "to": new})
             i += 2
             continue
         i += 1
-        if code in ("A", "??"):
+        if code == "??" or "A" in code:
             result["added"].append(name)
-        elif code in ("M", "T", "AM", "MM"):
+        elif "M" in code or "T" in code:
             result["modified"].append(name)
-        elif code == "D":
+        elif "D" in code:
             result["deleted"].append(name)
     return result
+
+
+def worktree_snapshot(root):
+    """Return a stable representation of the working tree state.
+
+    An index may intentionally be built from a dirty tree.  Keeping the
+    snapshot taken at build time lets callers distinguish that case from a
+    source change made *after* the index was built.  This is deliberately
+    based on git-status paths rather than timestamps or generated index contents.
+    """
+    dirty = changed_vs_head(root)
+    if dirty is None:
+        return None
+    return {
+        "added": sorted(dirty.get("added") or []),
+        "modified": sorted(dirty.get("modified") or []),
+        "deleted": sorted(dirty.get("deleted") or []),
+        "renamed": sorted(dirty.get("renamed") or [],
+                          key=lambda item: (item.get("from", ""),
+                                            item.get("to", ""))),
+    }
 
 
 def diff_vs_base(root, base):

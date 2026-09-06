@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from mlir_repomap import repo  # noqa: E402
 from mlir_repomap.index import Indexer  # noqa: E402
 from mlir_repomap.query import QueryService  # noqa: E402
 
@@ -104,6 +105,65 @@ class FixtureTest(unittest.TestCase):
             idx = Indexer(self.repo)
             idx.build()
             idx.close()
+
+    def test_status_compares_the_indexed_worktree_snapshot(self):
+        """A refreshed dirty tree is fresh; a later edit is not.
+
+        Real compiler checkouts commonly carry local changes.  ``stale`` must
+        describe whether those exact contents were indexed, not whether the
+        checkout happens to differ from HEAD.
+        """
+        tmp = tempfile.mkdtemp()
+        source = os.path.join(tmp, "Simple.td")
+        try:
+            _git(tmp, "init", "-q")
+            with open(source, "w") as f:
+                f.write('def SimpleDialect : Dialect<"simple"> {}\n')
+            _git(tmp, "add", "Simple.td")
+            _git(tmp, "commit", "-qm", "initial")
+
+            idx = Indexer(tmp)
+            idx.build(full=True)
+            idx.close()
+            svc = QueryService(tmp)
+            self.assertFalse(svc.repo_status()["index"]["stale"])
+            svc.close()
+
+            with open(source, "a") as f:
+                f.write("// local analysis change\n")
+            svc = QueryService(tmp)
+            self.assertTrue(svc.repo_status()["index"]["stale"])
+            svc.close()
+
+            idx = Indexer(tmp)
+            idx.build()
+            idx.close()
+            svc = QueryService(tmp)
+            self.assertFalse(svc.repo_status()["index"]["stale"])
+            svc.close()
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_worktree_snapshot_tracks_unstaged_changes_and_renames(self):
+        tmp = tempfile.mkdtemp()
+        original = os.path.join(tmp, "original.td")
+        renamed = os.path.join(tmp, "renamed.td")
+        try:
+            _git(tmp, "init", "-q")
+            with open(original, "w") as f:
+                f.write('def SimpleDialect : Dialect<"simple"> {}\n')
+            _git(tmp, "add", "original.td")
+            _git(tmp, "commit", "-qm", "initial")
+            with open(original, "a") as f:
+                f.write("// unstaged\n")
+            self.assertEqual(repo.changed_vs_head(tmp)["modified"], ["original.td"])
+            with open(original, "w") as f:
+                f.write('def SimpleDialect : Dialect<"simple"> {}\n')
+            _git(tmp, "mv", "original.td", "renamed.td")
+            renamed_paths = repo.worktree_snapshot(tmp)["renamed"]
+            self.assertEqual(renamed_paths, [{"from": "original.td", "to": "renamed.td"}])
+        finally:
+            shutil.rmtree(tmp)
 
     def test_pass_resolution_by_class_and_factory_name(self):
         # user-facing names: td class / cpp class / factory, not only the pass arg

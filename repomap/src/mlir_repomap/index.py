@@ -124,7 +124,9 @@ class Indexer:
                                            "stats": stats,
                                            "schema_version": model.SCHEMA_VERSION,
                                            "indexer_version": model.INDEXER_VERSION,
-                                           "config": self.conf})
+                                           "config": self.conf,
+                                           "worktree_snapshot": repo.worktree_snapshot(
+                                               self.root)})
         return stats
 
     # ---- deterministic graph resolution (ADR-001) ----

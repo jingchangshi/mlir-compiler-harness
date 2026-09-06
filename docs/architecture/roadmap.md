@@ -1,59 +1,27 @@
 # Roadmap
 
-done: Phase 0-17 (…, semantic finding impact analysis, compiler review memory &
-evidence retrieval; ADR-001..023). Repos: AscendNPU-IR (baseline), triton-ascend
-(hybrid), ecosystem layer over both.
+已完成：Phase 0–18（ADR-001..023）。Phase 18 在 AscendNPU-IR 与 triton-ascend 执行
+真实索引、pass/pipeline 工作流、finding drift、impact、review memory 与历史 replay；
+结论见 `docs/validation/phase18/`。
 
-current: none.
+当前：维护已验证的确定性图、文档层 finding 和 review memory；不在图中保存推理、
+review conclusion 或 finding status。
 
-next (based on Phase 17 evidence):
-1. **Review-scope watchlist delivery** (carried): the 7 seeded findings + their
-   review-memory entries are concrete leads for the target repos' teams.
-2. **EG-1 remainder / ecosystem persistence** (carried).
-3. C++-level attribute definitions (attrs without td AttrDef) still surface only as
-   a diagnostic; gtest linking is name-level only (stage 1); dossier location relies
-   on the documented docs-layout convention.
+下一步仅作证据驱动的评估：
 
-deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
+1. **Deeper semantic extraction（Python composed pipeline stage view）**：Phase 18
+   证实 `pipeline-composition` 可解释单个 pass 的 Python→C++ provenance，却不能
+   以 `pipeline` 查询完整 Python stage order、guard 和 swap contract。先验证一个
+   通用表示能否覆盖两个目标仓，再决定是否实现。
 
-deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics —
-the intent/constraint layer reduced the pressure for all of them.
+仍 deferred：
 
-deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
+- watchlist：Phase 18 最新提交检查均为 clean；没有推送机制的真实压力。
+- MCP：CLI 已完成完整工作流，未观察到适配器阻塞。
+- clangd：没有 wrong-fact incident；当前问题是 Python 编排语义而非 C++ 名称解析。
+- runtime contract graph、embedding search、cross-repository contract validation：
+  TTL-001 显示跨仓 evidence 仍需人工判断，但证据不足以承担该架构扩张。
+- attribute value semantics、完整 gtest coverage extraction：维持既有限制记录。
 
-deferred (unchanged): MCP, clangd, attribute value semantics, full interpreter.
-
-deferred (unchanged): MCP, clangd, gtest coverage extraction, cross-repo handoff
-declarations (QG-7) — none blocking; the ecosystem now spans two repos with provenance.
-
-deferred: MCP, clangd, EG-5 gtest coverage, cross-repo handoff edges (QG-7) — none
-blocking; revisit after EG-3.
-
-deferred (unchanged): MCP — no hot-path pressure through Phase 7; clangd — no wrong-fact
-incident through Phase 7; attribute value semantics — RG-1 does not require it yet.
-
-deferred (unchanged, evidence-based): MCP — no hot-path pressure through Phase 6; clangd —
-no wrong-fact incident through Phase 6; the remaining name-level attribute semantics and
-non-RewritePatternSet indirection do not yet justify a full semantic backend.
-
-deferred (evidence-based):
-- **A. MCP adapter** — no CLI-inconvenience pressure in Phases 4–5.
-- **B. clangd backend** — no wrong-fact incident in Phases 3–5; the flagged heuristics held.
-- Multi-repo adapter hardening — after the extraction fixes above, so new repos are
-  onboarded against the improved baseline.
-
-deferred:
-- clangd/LSP semantic backend — no wrong-fact incident in Phase 3/4 validations;
-  the flagged locality heuristic held. Revisit only if a dossier contradicts the graph.
-- Ranking/PageRank, embeddings, Web UI.
-
-rejected: indexing generated build-tree C++ (ADR-001); per-config pipeline variant nodes (ADR-002);
-methodology duplication inside adapters (ADR-010).
-
-deferred:
-- clangd/LSP semantic backend — ADR-007 factory-namespace disambiguation is the only
-  confirmed consumer; the flagged locality heuristic held up in Phase 3. Revisit if dossiers
-  start contradicting the graph.
-- Ranking/PageRank, embeddings, Web UI.
-
-rejected: indexing generated build-tree C++ (ADR-001); per-config pipeline variant nodes (ADR-002).
+已拒绝：把 finding/review reasoning 写入图、根据 drift 自动改变 finding status、以及
+在没有真实工作流证据时提前启动新方向。

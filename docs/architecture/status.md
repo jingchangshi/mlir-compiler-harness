@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-05 (Phases 0–13 complete)
+Updated: 2026-09-06 (Phases 0–18 complete)
 
 ## Implemented
 
@@ -117,12 +117,24 @@ remains (`populate*` chasing) and did not block the workflows.
   entries grounded in real commits; workflows gain pass-analysis step 0 (evolution
   check) + pipeline-audit lens 1e (risk delta); 25/25 tests.
 
+- Phase 18 real repository evolution validation (`docs/validation/phase18/`): both real
+  repositories indexed with 0 diagnostics (AscendNPU-IR: 332 passes / 80 pipelines;
+  triton-ascend: 144 passes / 8 C++ pipelines). Full pass/pipeline/review workflows
+  exercised MergeVecScope, AutoVectorizeV2, HFusion FlattenOps and triton-to-linalg;
+  AV2-001 and MVS-001 were replayed against their real historical commits, while two
+  latest-commit checks were clean negative results. Validation fixed `status.stale` to
+  compare the indexed working-tree snapshot: a freshly indexed dirty checkout is fresh,
+  and an edit made afterwards is stale. The evidence-backed next candidate is deeper
+  semantic extraction for Python-composed pipeline stage order; no large architecture
+  was implemented.
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
   is name-level (no per-op attachment).
-- Triton-ecosystem gaps: Python-composed pipelines invisible (EG-3), runOnOperation
-  pipeline mislabel (EG-1), gtest coverage not extracted (EG-5) — designs recorded.
+- Python-composition provenance resolves Python → binding → factory → pass, but Python
+  stage lists are not first-class `pipeline` nodes; full order/guard auditing still
+  requires source or a dossier.
 - Pipeline detection is signature-based; some entry functions (e.g. `runRegBaseCompile`) missed.
 - Op extraction covers direct defs and one-level multiclass aliases.
 - Same-name factories across namespaces resolved by flagged locality heuristic (ADR-007).
@@ -133,7 +145,9 @@ remains (`populate*` chasing) and did not block the workflows.
 - No MCP, no agent skills, no clangd (deliberately deferred).
 - Findings: commit attribution is file-granular; `--since` needed when findings lack a
   recorded baseline; constraint line anchors can be off by one (snippet check tolerates).
+  External-repository evidence is explicitly not drift-checked by a single-repo query.
 
 ## Next recommended phase
 
-See roadmap.md — review memory is queryable; remaining candidates ranked there (ADR-023).
+See roadmap.md — Phase 18 evidence ranks only deeper semantic extraction for evaluation;
+review memory is already queryable (ADR-023).

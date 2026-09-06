@@ -21,9 +21,9 @@ class QueryService:
     def _index_info(self):
         meta = self.store.get_meta("last_build", {}) or {}
         facts = repo.git_facts(self.root)
-        dirty = repo.changed_vs_head(self.root)
+        worktree_snapshot = repo.worktree_snapshot(self.root)
         stale = (not meta) or meta.get("head") != facts.get("head") or (
-            dirty and (dirty.get("modified") or dirty.get("added") or dirty.get("deleted")))
+            meta.get("worktree_snapshot") != worktree_snapshot)
         return {"head": meta.get("head"), "branch": meta.get("branch"),
                 "indexed_at": meta.get("when"), "schema_version": meta.get("schema_version"),
                 "current_head": facts.get("head"), "current_branch": facts.get("branch"),
