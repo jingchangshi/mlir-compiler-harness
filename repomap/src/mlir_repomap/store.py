@@ -59,6 +59,9 @@ class Store:
         self.db.execute("DELETE FROM files WHERE path=?", (path,))
         self.db.execute("DELETE FROM diagnostics WHERE file=?", (path,))
 
+    def clear_diagnostics(self, path):
+        self.db.execute("DELETE FROM diagnostics WHERE file=?", (path,))
+
     def record_diagnostic(self, path, message):
         self.db.execute("INSERT OR REPLACE INTO diagnostics VALUES (?,?)", (path, message))
 

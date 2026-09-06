@@ -68,7 +68,7 @@ def extract(relpath, text):
     for m in RE_ATTR_NAME.finditer(text):
         hits.append((m.group(1) or m.group(2), m.start()))
     if not hits:
-        return nodes, edges, []
+        return {"nodes": nodes, "edges": edges, "diagnostics": []}
 
     containers = []  # (start, end, container_id, creator_type|None, kind_hint)
 

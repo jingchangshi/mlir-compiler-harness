@@ -25,6 +25,8 @@ CATEGORIES = ("correctness", "coverage", "performance", "architecture",
 STATUSES = ("open", "acknowledged", "in-progress", "resolved", "rejected",
             "superseded")
 RISKS = ("low", "medium", "high")
+ENTITY_REF_KINDS = ("pass", "pattern", "attribute", "op", "operation",
+                    "pipeline", "function", "dialect")
 
 _REQUIRED = ("id", "category", "pass", "statement", "evidence", "reasoning",
              "status", "created_at")
@@ -253,6 +255,20 @@ def validate_finding(data, source="<finding>"):
         elif reg.get("regression_risk") is not None \
                 and reg.get("regression_risk") not in RISKS:
             _err(errors, source, f"regression_risk must be one of {RISKS}")
+    # entity_refs (Phase 16): references to EXISTING graph entities only —
+    # a finding never creates facts; kind keys are validated, ids at query time
+    er = f.get("entity_refs")
+    if er is not None:
+        if not isinstance(er, list):
+            _err(errors, source, "entity_refs must be a list")
+        else:
+            for n, item in enumerate(er):
+                if not isinstance(item, dict) or len(item) != 1 \
+                        or list(item)[0] not in ENTITY_REF_KINDS \
+                        or not str(list(item.values())[0] or "").strip():
+                    _err(errors, source,
+                         f"entity_refs[{n}] must be 'kind: entity-id' with "
+                         f"kind in {ENTITY_REF_KINDS}")
     return errors
 
 

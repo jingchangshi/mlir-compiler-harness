@@ -58,6 +58,11 @@ def main(argv=None):
     p = sub.add_parser("pass-intent"); p.add_argument("name")
     p = sub.add_parser("pass-constraints"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
+    fi = sub.add_parser("finding-impact")
+    fi.add_argument("fid"); fi.add_argument("--dir"); fi.add_argument("--git-repo")
+    fi.add_argument("--since")
+    p = sub.add_parser("constraint-diff"); p.add_argument("path")
+    p.add_argument("--since", required=True)
     fin = sub.add_parser("findings")
     fsub = fin.add_subparsers(dest="fsub", required=True)
     fl = fsub.add_parser("list")
@@ -71,6 +76,27 @@ def main(argv=None):
 
     args = ap.parse_args(argv)
     root = args.repo
+
+    if args.cmd == "constraint-diff":
+        from .impact import constraint_diff
+        result = constraint_diff(root, args.path, args.since)
+        print(json.dumps({"command": "constraint-diff", "result": result},
+                         indent=1, default=str))
+        return 0
+
+    if args.cmd == "finding-impact":
+        from .impact import ImpactService
+        fdir = args.dir or os.path.join(root, "docs", "compiler-architecture",
+                                        "findings")
+        svc = ImpactService(root, findings_dir=fdir,
+                            git_repo=args.git_repo or root)
+        try:
+            result = svc.impact(args.fid, since=args.since)
+        finally:
+            svc.close()
+        print(json.dumps({"command": "finding-impact", "result": result},
+                         indent=1, default=str))
+        return 0
 
     if args.cmd == "findings":
         from .findings import FindingService

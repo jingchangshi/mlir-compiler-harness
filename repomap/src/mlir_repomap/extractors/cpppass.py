@@ -16,6 +16,98 @@ RE_FACTORY_DECL = re.compile(
     r'^\s*std::unique_ptr\s*<\s*[\w:<>,\s]+>\s*create(\w+)Pass\s*\([^;{]*\)\s*;', re.M)
 RE_PASS_REG = re.compile(r'\bPassRegistration\s*<\s*(\w+)\s*>')
 RE_ANALYSIS = re.compile(r'\b(?:class|struct)\s+(\w+)\s*:\s*public\s+\w*Analysis\s*<')
+RE_FAIL = re.compile(r'(?:return\s+)?(?:failure\s*\(|WalkResult::skip\s*\(\)|'
+                     r'signalPassFailure\s*\(\))|notifyMatchFailure\s*\(')
+RE_REASON = re.compile(r'notifyMatchFailure\s*\([^;]*?"([^"\n]{3,140})"')
+RE_METHOD_DEF = re.compile(
+    r'\b([A-Za-z]\w*)::([A-Za-z]\w*)\s*\([^;{]*\)\s*(?:const\s*)?\{')
+
+
+def _brace_span(text, start):
+    d = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            d += 1
+        elif text[i] == "}":
+            d -= 1
+            if d == 0:
+                return (start, i)
+    return None
+
+
+def scan_constraints(relpath, text):
+    """Deterministic constraint records for one C++ file (Phase 12 semantics).
+
+    Returns (cls_name, kind, line, text) records — exactly what extract() emits
+    as constraint nodes. Exposed as a module function so the Phase 16
+    constraint-evolution diff runs the identical scanner on historical text.
+    """
+    lines_all = text.split("\n")
+    class_spans = []
+    for m in RE_PASS_CLASS.finditer(text):
+        start = text.find("{", m.start())
+        span = _brace_span(text, start) if start != -1 else None
+        if span:
+            class_spans.append((m.group(1), span[0], span[1]))
+    cls_names = {c for c, _, _ in class_spans}
+    method_spans = []
+    for m in RE_METHOD_DEF.finditer(text):
+        if m.group(1) in cls_names:
+            span = _brace_span(text, m.end() - 1)
+            if span:
+                method_spans.append((m.group(1), span[0], span[1]))
+
+    records = []
+    for cls_name, s0, e0 in class_spans + method_spans:
+        body = text[s0:e0]
+        base_line = text[:s0].count("\n") + 1
+        seen_offs = set()
+
+        def rec(kind, off, txt, cls_name=cls_name):
+            records.append((cls_name, kind, off, txt))
+
+        # notifyMatchFailure with literal reason
+        for m in RE_REASON.finditer(body):
+            off = base_line + body[:m.start()].count("\n")
+            seen_offs.add(off)
+            rec("match-failure", off, m.group(1))
+        # failure/skip/signalPassFailure guards
+        for m in RE_FAIL.finditer(body):
+            off = base_line + body[:m.start()].count("\n")
+            if off in seen_offs:
+                continue
+            cond = None
+            for back in range(1, 4):
+                idx = off - back
+                if idx < 1:
+                    break
+                line = lines_all[idx - 1].strip()
+                if line.startswith("if ") or line.startswith("} else if ") or \
+                        line.startswith("else if") or " if (" in line:
+                    po = line.find("(")
+                    if po != -1:
+                        cond = line[po + 1:].rstrip("){ ").strip()[:140]
+                    break
+            if "notifyMatchFailure" in m.group(0):
+                continue  # reasonless notifyMatchFailure: skip (reason ones captured)
+            if "signalPassFailure" in m.group(0) and not cond:
+                ctx = ""
+                for back in range(1, 4):
+                    idx = off - back
+                    if idx < 1:
+                        break
+                    line = lines_all[idx - 1].strip()
+                    if line and not line.startswith("//"):
+                        ctx = line[:140]
+                        break
+                rec("pass-failure", off, ctx or "signalPassFailure")
+                continue
+            if not cond:
+                continue
+            kind = ("legality-guard" if "failure" in m.group(0).lower()
+                    else "early-return")
+            rec(kind, off, cond)
+    return records
 
 
 def extract(relpath, text):
@@ -82,95 +174,16 @@ def extract(relpath, text):
 
     # Optimization-constraint extraction (Phase 12): legality guards inside pass
     # implementation classes and their out-of-line method bodies. Deterministic:
-    # condition text + reason string + evidence line; no interpretation.
-    RE_FAIL = re.compile(r'(?:return\s+)?(?:failure\s*\(|WalkResult::skip\s*\(\)|'
-                         r'signalPassFailure\s*\(\))|notifyMatchFailure\s*\(')
-    RE_REASON = re.compile(r'notifyMatchFailure\s*\([^;]*?"([^"\n]{3,140})"')
-    lines_all = text.split("\n")
-
-    class_spans = []
-    for m in RE_PASS_CLASS.finditer(text):
-        start = text.find("{", m.start())
-        d = 0
-        for i in range(start, len(text)):
-            if text[i] == "{":
-                d += 1
-            elif text[i] == "}":
-                d -= 1
-                if d == 0:
-                    class_spans.append((m.group(1), start, i))
-                    break
-    cls_names = {c for c, _, _ in class_spans}
-    method_spans = []
-    for m in re.finditer(
-            r'\b([A-Za-z]\w*)::([A-Za-z]\w*)\s*\([^;{]*\)\s*(?:const\s*)?\{', text):
-        if m.group(1) in cls_names:
-            start = m.end() - 1
-            d = 0
-            for i in range(start, len(text)):
-                if text[i] == "{":
-                    d += 1
-                elif text[i] == "}":
-                    d -= 1
-                    if d == 0:
-                        method_spans.append((m.group(1), start, i))
-                        break
-
-    def _emit(cid, name, summary, cls_name, off, kind, ln):
-        nodes.append({"id": cid, "kind": model.CONSTRAINT, "name": name,
-                      "summary": summary[:140], "file": relpath, "line": ln})
+    # condition text + reason string + evidence line; no interpretation. The
+    # scanning logic lives in scan_constraints (shared with the Phase 16
+    # constraint-evolution diff).
+    for cls_name, kind, off, txt in scan_constraints(relpath, text):
+        cid = f"constraint:{relpath}:{off}"
+        nodes.append({"id": cid, "kind": model.CONSTRAINT, "name": f"{kind} @ line {off}",
+                      "summary": txt[:140], "file": relpath, "line": off})
         edges.append({"src": f"pass_class:{cls_name}", "dst": cid,
                       "kind": model.HAS_CONSTRAINT, "props": {"kind": kind},
-                      "evidence": ev(ln)})
-
-    for cls_name, s0, e0 in class_spans + method_spans:
-        body = text[s0:e0]
-        base_line = text[:s0].count("\n") + 1
-        seen_offs = set()
-        # notifyMatchFailure with literal reason
-        for m in RE_REASON.finditer(body):
-            off = base_line + body[:m.start()].count("\n")
-            seen_offs.add(off)
-            _emit(f"constraint:{relpath}:{off}", f"match-failure @ line {off}",
-                  m.group(1), cls_name, off, "match-failure", off)
-        # failure/skip/signalPassFailure guards
-        for m in RE_FAIL.finditer(body):
-            off = base_line + body[:m.start()].count("\n")
-            if off in seen_offs:
-                continue
-            cond = None
-            for back in range(1, 4):
-                idx = off - back
-                if idx < 1:
-                    break
-                line = lines_all[idx - 1].strip()
-                if line.startswith("if ") or line.startswith("} else if ") or \
-                        line.startswith("else if") or " if (" in line:
-                    po = line.find("(")
-                    if po != -1:
-                        cond = line[po + 1:].rstrip("){ ").strip()[:140]
-                    break
-            if "notifyMatchFailure" in m.group(0):
-                continue  # reasonless notifyMatchFailure: skip (reason ones captured)
-            if "signalPassFailure" in m.group(0) and not cond:
-                ctx = ""
-                for back in range(1, 4):
-                    idx = off - back
-                    if idx < 1:
-                        break
-                    line = lines_all[idx - 1].strip()
-                    if line and not line.startswith("//"):
-                        ctx = line[:140]
-                        break
-                _emit(f"constraint:{relpath}:{off}", f"pass-failure @ line {off}",
-                      ctx or "signalPassFailure", cls_name, off, "pass-failure", off)
-                continue
-            if not cond:
-                continue
-            kind = ("legality-guard" if "failure" in m.group(0).lower()
-                    else "early-return")
-            _emit(f"constraint:{relpath}:{off}", f"{kind} @ line {off}",
-                  cond, cls_name, off, kind, off)
+                      "evidence": ev(off)})
 
     # PyBind-style binding boundary (Phase 9): a string name mapped to a C++ function,
     # via m.def("name", fn) / WRAPPER-style macros ("name", fn), OR via m.def("name",

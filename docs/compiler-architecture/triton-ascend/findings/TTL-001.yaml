@@ -29,6 +29,9 @@ finding:
     natural home for a handoff-contract check. Per-axis semantics are lost at
     flatten (reassociation pairs only); retaining axis-identity metadata through
     flatten is the recorded opportunity.
+  entity_refs:
+    - pass: triton-to-linalg
+    - attribute: StrideAlignDimsAttr
   status: open
   created_at: 2026-09-05
   created_by: phase13-review

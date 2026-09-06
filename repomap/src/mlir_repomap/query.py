@@ -34,7 +34,7 @@ class QueryService:
     def _evidence_summary(self, edges):
         for e in edges:
             e["confidence"] = (max((x["confidence"] for x in e["evidence"]),
-                                   key=["heuristic", "inferred", "confirmed"].index)
+                                   key=["heuristic", "inferred", "exact", "confirmed"].index)
                                if e["evidence"] else "unknown")
         return edges
 

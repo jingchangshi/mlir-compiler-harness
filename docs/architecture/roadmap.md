@@ -1,19 +1,18 @@
 # Roadmap
 
-done: Phase 0-15 (…, knowledge evolution loop, attribute creator precision; ADR-001..021).
-Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer over both.
+done: Phase 0-16 (…, attribute creator precision, semantic finding impact analysis;
+ADR-001..022). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer
+over both.
 
 current: none.
 
-next (based on Phase 15 evidence):
-1. **Finding-resolution assists** (auto-assistable, never auto-status): test-coverage
-   churn via TEST_COVERS_PASS, constraint re-extraction diff as a drift signal,
-   ecosystem contract validation for TTA-001 — TTA-001's per-attribute chain stays
-   unattributable (dynamic setAttrs forwarding), but the contract inventory check is
-   now machine-runnable.
+next (based on Phase 16 evidence):
+1. **Review-scope watchlist delivery**: the impact reports for the 7 seeded findings
+   are concrete review leads for the target repos' teams (as Phase 13's unguarded
+   invariants were) — package as deliverables, which also validates practical value.
 2. **EG-1 remainder / ecosystem persistence** (carried).
-3. C++-level attribute definitions (attrs without td AttrDef — StrideAlignDimsAttr
-   family) surfaced only as a diagnostic today.
+3. C++-level attribute definitions (attrs without td AttrDef) still surface only as a
+   diagnostic; gtest linking is name-level only (stage 1).
 
 deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
 

@@ -90,6 +90,17 @@ plus guard text replaces repository-wide searching.
    their order, guards, and options with the same rigor as C++ builders, and state
    which language constructs the pipeline and where passes are inserted.
 
+1f. **Finding impact lens** — for every finding whose `entity_refs` (or pass field)
+   touches a pass in this pipeline, run `mlir-repomap finding-impact <id>` and collect
+   the per-finding impact reports into a pipeline-level review map: which findings are
+   affected by commits since their baselines, which constraint sets changed (added /
+   removed / moved guards with structural classification), and which linked tests
+   (exact lit flags vs heuristic gtest names) guard the affected areas. Output per
+   finding: finding id → affected entities → changed signals → review scope. The lens
+   aggregates only; lifecycle decisions stay with the finding owners (ADR-020), and
+   findings whose evidence has no drift are reported as clean (a negative result is a
+   result).
+
 2. **Hidden invariants / cross-pass state (attribute contracts)** — pass options or IR
    markers that one stage writes and another reads. For every annotation/metadata/marker
    attribute discovered in the stages, run

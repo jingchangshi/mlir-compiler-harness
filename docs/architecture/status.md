@@ -85,6 +85,14 @@ remains (`populate*` chasing) and did not block the workflows.
   verifier completeness, annotation name validation, cross-dialect flatten contract);
   workflows 7f + lens 1x; no engine changes.
 
+- Phase 16 semantic finding impact analysis (ADR-022, `docs/validation/phase16/`):
+  findings gain `entity_refs` (graph-validated references, never node-creating);
+  `finding-impact <id>` joins entities + file drift + constraint evolution diff +
+  test coverage into a deterministic review-scope suggestion; `constraint-diff`
+  reuses the extracted Phase 12 scanner (counts identical post-refactor); test
+  coverage signal (lit exact / gtest name-heuristic, EG-5 stage 1); workflows step 0
+  + lens 1f; cross-repo ecosystem validation explicitly rejected; tests 38/38.
+
 - Phase 15 attribute creator precision (ADR-021, `docs/validation/phase15/`): RG-1
   closed — `attribute-provenance` query joins td definitions (attr + DIALECT_OWNS),
   container-typed creators (OpBuilder/RewritePattern/ConversionPattern/Pass/
@@ -120,5 +128,5 @@ remains (`populate*` chasing) and did not block the workflows.
 
 ## Next recommended phase
 
-Finding-resolution assists (test-coverage churn, constraint re-extraction diff,
-ecosystem contract validation for TTA-001) — see roadmap.md and ADR-021.
+See roadmap.md — finding-resolution assists are partially delivered by Phase 16
+(constraint diff + test signal); the remaining candidates are ranked there (ADR-022).

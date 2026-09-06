@@ -250,3 +250,188 @@ class AttributeProvenanceTest(unittest.TestCase):
 
     def test_unknown_attribute(self):
         self.assertEqual(self._prov("Nope_Attr").get("error"), "not found")
+
+
+class FindingImpactTest(unittest.TestCase):
+    """Phase 16 (ADR-022): entity-aware finding impact + constraint diff."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = os.path.join(FIXTURES, "simple-pass")
+        idx = Indexer(cls.repo)
+        idx.build(full=True)
+        idx.close()
+        cls.tmp = tempfile.mkdtemp()
+        cls.findings = os.path.join(cls.tmp, "findings")
+        os.makedirs(cls.findings)
+        # a controlled git repo for drift + constraint diff: guard changes
+        # between baseline and HEAD while entity_refs resolve against the
+        # fixture graph (the two are independent by design)
+        cls.grepo = os.path.join(cls.tmp, "grepo")
+        os.makedirs(cls.grepo)
+        cls._git("init", "-q")
+        cls._git("config", "user.email", "t@t")
+        cls._git("config", "user.name", "t")
+        cls._write_pass(["  if (dim > 4) {", "    return signalPassFailure();", "  }"])
+        cls._git("add", "-A")
+        cls._git("commit", "-q", "-m", "base with guard")
+        out = subprocess.run(["git", "-C", cls.grepo, "rev-parse", "HEAD"],
+                             capture_output=True, text=True)
+        cls.base = out.stdout.strip()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    @staticmethod
+    def _guard_body(guard_lines):
+        body = "\n".join(guard_lines)
+        return f'''
+#include "mlir/Pass/Pass.h"
+using namespace mlir;
+struct FoldPass : public PassWrapper<OperationPass<ModuleOp>> {{
+  void runOnOperation() override {{
+    int dim = 0;
+{body}
+  }}
+}};
+'''
+
+    @classmethod
+    def _write_pass(cls, guard_lines):
+        with open(os.path.join(cls.grepo, "pass.cpp"), "w") as fh:
+            fh.write(cls._guard_body(guard_lines))
+
+    @classmethod
+    def _git(cls, *args):
+        subprocess.run(["git", "-C", cls.grepo, *args], capture_output=True,
+                       check=True)
+
+    def _write_finding(self, name, text):
+        with open(os.path.join(self.findings, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    def _finding(self, refs='  entity_refs:\n    - pass: simple-fold\n'):
+        return f'''\
+finding:
+  id: FI-001
+  category: correctness
+  pass: simple-fold
+  statement: >-
+    The fold guard may be weakened by recent changes.
+  evidence:
+    - file: pass.cpp
+      lines: 4-8
+      snippet: "signalPassFailure"
+  reasoning: >-
+    Agent reasoning: the guard change may weaken the protected invariant.
+{refs}  status: open
+  created_at: 2026-09-05
+  review:
+    baseline_commit: {self.base}
+'''
+
+    def test_finding_entity_ref_validation(self):
+        from mlir_repomap.findings import parse_finding_text, validate_finding
+        good = parse_finding_text(self._finding())
+        self.assertEqual(validate_finding(good), [])
+        bad = self._finding(refs='  entity_refs:\n    - dragon: simple-fold\n')
+        errs = validate_finding(parse_finding_text(bad))
+        self.assertTrue(any("entity_refs" in e for e in errs))
+
+    def test_finding_impact_query_with_signals(self):
+        self._write_finding("FI-001.yaml", self._finding())
+        # evolve the guard: same shape, new condition + new commit on the file
+        self._write_pass(["  if (dim > 8) {", "    return signalPassFailure();", "  }"])
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "relax fold guard")
+        from mlir_repomap.impact import ImpactService
+        svc = ImpactService(self.repo, findings_dir=self.findings,
+                            git_repo=self.grepo)
+        try:
+            r = svc.impact("FI-001")
+        finally:
+            svc.close()
+        self.assertEqual(r["affected_entities"][0]["id"], "pass:simple-fold")
+        self.assertEqual(r["affected_entities"][0]["resolution"], "exact")
+        types = {s["type"] for s in r["changed_signals"]}
+        self.assertIn("file-commits", types)
+        self.assertIn("constraint-diff", types)
+        cd = next(s for s in r["changed_signals"]
+                  if s["type"] == "constraint-diff")
+        self.assertEqual(cd["classification"], "changed guard set")
+        self.assertTrue(any("dim > 4" == x["text"] for x in cd["removed"]))
+        self.assertTrue(any("dim > 8" == x["text"] for x in cd["added"]))
+        self.assertTrue(r["test_signal"], "lit coverage expected")
+        self.assertIn("pass:simple-fold", r["review_scope"]["suggestion"])
+
+    def test_finding_impact_negative_no_evidence_no_impact(self):
+        # baseline = current state: no commits, no constraint change
+        out = subprocess.run(["git", "-C", self.grepo, "rev-parse", "HEAD"],
+                             capture_output=True, text=True)
+        head = out.stdout.strip()
+        text = self._finding().replace(self.base, head).replace("FI-001", "FI-NEG")
+        self._write_finding("FI-NEG.yaml", text)
+        from mlir_repomap.impact import ImpactService
+        svc = ImpactService(self.repo, findings_dir=self.findings,
+                            git_repo=self.grepo)
+        try:
+            r = svc.impact("FI-NEG")
+        finally:
+            svc.close()
+        self.assertEqual(r["changed_signals"], [])
+        self.assertTrue(r["review_scope"]["suggestion"].endswith(
+            "(no file-level drift detected since baseline)"))
+
+    def test_finding_impact_unresolved_ref_is_uncertainty(self):
+        text = self._finding().replace(
+            "    - pass: simple-fold",
+            "    - pass: no-such-pass-xyz").replace("FI-001", "FI-UNC")
+        self._write_finding("FI-UNC.yaml", text)
+        from mlir_repomap.impact import ImpactService
+        svc = ImpactService(self.repo, findings_dir=self.findings,
+                            git_repo=self.grepo)
+        try:
+            r = svc.impact("FI-UNC")
+        finally:
+            svc.close()
+        # the finding's own pass field still resolves; the bad ref is uncertainty
+        self.assertTrue(any("no pass entity" in u for u in r["uncertainty"]))
+        self.assertEqual(r["affected_entities"][0]["resolution"], "not-found")
+
+    def test_constraint_diff_classifications(self):
+        from mlir_repomap.impact import constraint_diff
+        self._write_pass(["  if (dim > 2) {", "    return signalPassFailure();", "  }"])
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "set baseline guard")
+        base = subprocess.run(["git", "-C", self.grepo, "rev-parse", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+        self._write_pass(["  if (dim > 2) {", "    return signalPassFailure();", "  }",
+                          "  if (magic) {", "    return failure();", "  }"])
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "add guard")
+        d = constraint_diff(self.grepo, "pass.cpp", base)
+        self.assertEqual(d["classification"],
+                         "possible strengthening (guard(s) added)")
+        self._write_pass([])
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "drop guard")
+        d = constraint_diff(self.grepo, "pass.cpp", base)
+        self.assertEqual(d["classification"],
+                         "possible weakening (guard(s) removed)")
+
+    def test_gtest_coverage_signal(self):
+        svc = QueryService(self.repo)
+        try:
+            r = svc.get_tests("simple-fold")
+            kinds = {t["test"]: t["confidence"] for t in r["tests"]}
+            self.assertTrue(any("SimplePassGTest" in t for t in kinds))
+            gtest = [c for t, c in kinds.items() if "SimplePassGTest" in t]
+            self.assertEqual(gtest, ["heuristic"])
+            # unrelated gtest suite must NOT be linked
+            self.assertFalse(any("UnrelatedSuite" in t for t in kinds))
+            lit = [c for t, c in kinds.items() if "SimplePassGTest" not in t]
+            self.assertTrue(lit and all(c == "exact" for c in lit),
+                            kinds)  # lit flag == confirmed pass arg
+        finally:
+            svc.close()

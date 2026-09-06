@@ -29,18 +29,22 @@ query would have answered it (feeds the query-API review).
 
 ## Fixed analysis spine (all 13 steps, in order)
 
-0. **Compiler evolution check** — before analyzing the current code, check what the
-   harness already remembers about this pass: run `mlir-repomap findings list
-   --pass-name <pass>` over the repo's findings directory and `mlir-repomap findings
-   check` (with `--since` reaching back past the pass's recent history when no baseline
-   is recorded). Answer both questions explicitly in the dossier:
-   *Does this pass have historical findings?* (open/in-progress items and their
-   categories) and *Were previous risks addressed?* (resolved/rejected entries, plus
-   the regression-memory `historical_concern`/`resolved_commit` records). An open
+0. **Compiler evolution impact check** — before analyzing the current code, check what
+   the harness already remembers about this pass and what changed underneath it:
+   (a) run `mlir-repomap findings list --pass-name <pass>` over the repo's findings
+   directory — *Does this pass have historical findings?* (open/in-progress items and
+   their categories) and *Were previous risks addressed?* (resolved/rejected entries,
+   plus regression-memory records); (b) for each finding touching this pass, run
+   `mlir-repomap finding-impact <id>` and read the deterministic join it returns:
+   existing finding + resolved entities + changed files/commits + constraint diff
+   (added/removed/moved guards, structural classification) + linked tests
+   (lit flag = exact, gtest name = heuristic). Compose the **review guidance** from
+   those four inputs: which areas to review first (constraint areas of the affected
+   pass), which tests to re-run, and which findings are stale-flagged. An open
    finding must be revisited in steps 12/13 and the review record (7f) must state
-   whether the current code still exhibits it; if the finding's evidence snippets no
-   longer verify, say so — the finding needs a status update, which the agent records
-   in the finding document (with reason + reference), never the engine.
+   whether the current code still exhibits it; status updates remain a manual,
+   reasoned edit of the finding document (ADR-020) — the impact report never
+   advances a lifecycle.
 1. **Pass identity** — arg, td class, summary, cpp class; note which identity came from
    evidence vs heuristic.
 2. **Registration** — `let constructor` factory, any PassRegistration, option definitions.

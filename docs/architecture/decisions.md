@@ -389,3 +389,38 @@ Consequences: INDEXER_VERSION 45 (full re-index); CREATES_ATTRIBUTE gains creato
 attach props and pattern/function/symbol sources; ecosystem creator lists become
 mechanism-honest; no new node kinds, no findings/reasoning in the graph (ADR-019/020
 separation intact).
+
+## ADR-022 (2026-09-05, accepted) — Semantic finding impact analysis: structural signals only, scope suggestion never a verdict
+
+Context: Phase 14's drift check is file-level ("commit touched an evidence file");
+it cannot say which compiler entity changed, which guard set changed, or which tests
+guard the affected area. Findings need a bridge from the doc layer back into the graph.
+Decision: (1) findings may declare optional `entity_refs` — single-key `kind: id`
+references to EXISTING graph entities; resolution happens at query time (exact id →
+unique name → explicit ambiguity/not-found uncertainty); findings never create nodes.
+(2) `finding-impact <id>` joins resolved entities + per-evidence-file git drift +
+constraint evolution + TEST_COVERS_PASS edges into one deterministic report ending in
+a review-scope *suggestion* (affected passes with their constraint-area counts and
+linked tests). (3) Constraint evolution diff (`constraint-diff <file> --since`) reuses
+the Phase 12 scanner extracted verbatim as `cpppass.scan_constraints` (output-preserving:
+constraint counts identical on both repos after full re-index) and classifies
+structurally only — "possible weakening (guard(s) removed)" / "possible strengthening" /
+"changed guard set" / "guards moved" — never a semantic judgment of correctness.
+(4) Test coverage signal (EG-5 stage 1): lit RUN-flag links upgrade to `exact` when the
+flag is a confirmed pass arg; gtest files (TEST/TEST_F idiom) become test nodes linked
+by normalized test-name containment with `heuristic` confidence. Rejected:
+**cross-repository ecosystem validation** (resolving entity_refs across repo indexes
+and validating handoff contracts) — complexity above benefit for now; cross-repo refs
+resolve against the opened index only and unresolvable refs surface as explicit
+uncertainty (validated with TTL-001). Also rejected: auto-status mutation from impact
+signals (ADR-020 stands); semantic weakening/strengthening interpretation.
+Limitations: constraint diff is per-file text-level (guards matched by kind+normalized
+text, so reformatting a condition counts as removed+added); gtest linking is name-level;
+lit `exact` means flag==pass-arg, not "this test truly exercises this pass path".
+Evidence: docs/validation/phase16/ — AV2-001 impact against the pre-fallback baseline
+(commits [fa682a1a3], guard `failed(result` added at :1406 → "possible strengthening"),
+MVS-001 against pre-migration (4 commits incl. 4ddead06f, "file absent at base"),
+TTL-001 single-repo (attribute exact / cross-repo pass uncertainty); tests 38/38.
+Consequences: INDEXER_VERSION 46 (gtest nodes + evidence confidence upgrade); the
+confidence ladder gains `exact` (heuristic < inferred < exact < confirmed); per-file
+diagnostics are cleared on successful re-extraction (stale diagnostics hygiene).

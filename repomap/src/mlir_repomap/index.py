@@ -5,6 +5,7 @@ are re-parsed. Graph resolution (factory->pass, test->pass filtering) re-runs ov
 whole graph after each build (cheap, deterministic).
 """
 import json
+import re
 import sqlite3
 import os
 import time
@@ -48,7 +49,7 @@ def _extractors_for(rel):
     if ext == ".td":
         return [tablegen]
     if ext in (".cpp", ".cc", ".h", ".hpp", ".c"):
-        return [cpppass, pipeline, pattern, attribute]
+        return [cpppass, pipeline, pattern, attribute, tests]
     if ext == ".mlir":
         return [tests]
     if ext == ".py":
@@ -104,6 +105,7 @@ class Indexer:
             if not exs:
                 continue
             stats["reextracted"] += 1
+            self.store.clear_diagnostics(rel)
             for ex in exs:
                 try:
                     self.store.add_finding(ex.extract(rel, text))
@@ -505,4 +507,60 @@ class Indexer:
             else:
                 db.execute("DELETE FROM evidence WHERE edge_id=?", (eid,))
                 db.execute("DELETE FROM edges WHERE edge_id=?", (eid,))
+
+        # Phase 16 (ADR-022): test coverage signal.
+        # lit flag links upgrade to `exact` when the flag is a confirmed pass arg
+        for eid, dst, props in db.execute(
+                "SELECT edge_id, dst, props FROM edges "
+                "WHERE kind='TEST_COVERS_PASS' AND props='{}'").fetchall():
+            if db.execute("SELECT 1 FROM nodes WHERE id=?", (dst,)).fetchone():
+                newp = json.dumps({"via": "flag", "confidence": "exact"})
+                try:
+                    db.execute("UPDATE edges SET props=? WHERE edge_id=?",
+                               (newp, eid))
+                    db.execute("UPDATE evidence SET confidence='exact' "
+                               "WHERE edge_id=?", (eid,))
+                except sqlite3.IntegrityError:
+                    pass
+        # gtest name-heuristic links: normalized pass arg contained in a
+        # TEST/TEST_F name — heuristic confidence, never invented (EG-5 stage 1)
+        gtests = db.execute(
+            "SELECT id, file FROM nodes WHERE kind='test' "
+            "AND summary LIKE 'gtest tests%'").fetchall()
+        pass_names = [r for r in db.execute(
+            "SELECT id, name FROM nodes WHERE kind='pass'").fetchall()]
+        for tid, tfile in gtests:
+            tpath = os.path.join(self.root, tfile)
+            if not os.path.exists(tpath):
+                continue
+            names = []
+            with open(tpath, encoding="utf-8", errors="replace") as fh:
+                for m in re.finditer(
+                        r"\bTEST(?:_F)?\s*\(\s*\w+\s*,\s*(\w+)\s*\)", fh.read()):
+                    names.append((m.group(1), m.start()))
+            for pid, pname in pass_names:
+                norm = pname.replace("-", "").lower()
+                if len(norm) < 5:
+                    continue
+                for tname, pos in names:
+                    if norm in tname.replace("_", "").lower():
+                        cur = db.execute(
+                            "SELECT edge_id FROM edges WHERE src=? AND dst=? "
+                            "AND kind='TEST_COVERS_PASS'", (tid, pid)).fetchone()
+                        if cur:
+                            continue
+                        db.execute(
+                            "INSERT INTO edges (src,dst,kind,props) VALUES (?,?,?,?)",
+                            (tid, pid, "TEST_COVERS_PASS",
+                             json.dumps({"via": "gtest-name",
+                                         "confidence": "heuristic"})))
+                        eid = db.execute(
+                            "SELECT edge_id FROM edges WHERE src=? AND dst=? "
+                            "AND kind='TEST_COVERS_PASS' AND props LIKE '%gtest-name%'",
+                            (tid, pid)).fetchone()[0]
+                        db.execute(
+                            "INSERT INTO evidence VALUES (?, ?, 1, 1, ?, "
+                            "'resolve', 'heuristic')",
+                            (eid, tfile, f"TEST name contains pass arg: {tname}"))
+                        break
         db.commit()
