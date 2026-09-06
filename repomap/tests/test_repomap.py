@@ -435,3 +435,212 @@ finding:
                             kinds)  # lit flag == confirmed pass arg
         finally:
             svc.close()
+
+
+class ReviewMemoryTest(unittest.TestCase):
+    """Phase 17 (ADR-023): review memory query + evidence catalog."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = os.path.join(FIXTURES, "simple-pass")
+        idx = Indexer(cls.repo)
+        idx.build(full=True)
+        idx.close()
+        cls.tmp = tempfile.mkdtemp()
+        cls.findings = os.path.join(cls.tmp, "findings")
+        cls.docs = os.path.join(cls.tmp, "docs")
+        os.makedirs(cls.findings)
+        os.makedirs(os.path.join(cls.docs, "passes"))
+        cls.grepo = os.path.join(cls.tmp, "grepo")
+        os.makedirs(cls.grepo)
+        cls._git("init", "-q")
+        cls._git("config", "user.email", "t@t")
+        cls._git("config", "user.name", "t")
+        cls._write_pass(["  if (dim > 4) {", "    return signalPassFailure();", "  }"])
+        cls._git("add", "-A")
+        cls._git("commit", "-q", "-m", "base with guard")
+        cls.base = subprocess.run(["git", "-C", cls.grepo, "rev-parse", "HEAD"],
+                                  capture_output=True, text=True).stdout.strip()
+        cls._write_finding("FI-001.yaml", f'''\
+finding:
+  id: FI-001
+  category: correctness
+  pass: simple-fold
+  statement: >-
+    The fold guard may be weakened.
+  evidence:
+    - file: pass.cpp
+      lines: 4-8
+      snippet: "signalPassFailure"
+  reasoning: >-
+    Agent reasoning layer.
+  status: open
+  created_at: 2026-09-05
+  review:
+    baseline_commit: {cls.base}
+''')
+        cls._write_finding("FV-002.yaml", '''\
+finding:
+  id: FV-002
+  category: architecture
+  pass: some-other-pass
+  statement: >-
+    Cross-cutting concern touching simple-fold via entity refs.
+  evidence:
+    - file: elsewhere.cpp
+      lines: 1-2
+  entity_refs:
+    - pass: simple-fold
+  reasoning: >-
+    Agent reasoning layer.
+  status: acknowledged
+  created_at: 2026-09-05
+''')
+        with open(os.path.join(cls.docs, "passes", "simple-fold.md"), "w") as fh:
+            fh.write('''# simple-fold (SimpleFoldPass)
+
+# Overview
+
+Folds simple ops.
+
+# Compiler Review (Phase 13 — review record, agent layer)
+
+- **Protected invariants**: folded-result validity, ENFORCED by the
+  legality-guard at SimpleFold.cpp:7.
+- **UNGUARDED**: none recorded.
+''')
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    @staticmethod
+    def _guard_body(guard_lines):
+        body = "\n".join(guard_lines)
+        return f'''
+struct FoldPass : public PassWrapper<OperationPass<ModuleOp>> {{
+  void runOnOperation() override {{
+    int dim = 0;
+{body}
+  }}
+}};
+'''
+
+    @classmethod
+    def _write_pass(cls, guard_lines):
+        with open(os.path.join(cls.grepo, "pass.cpp"), "w") as fh:
+            fh.write(cls._guard_body(guard_lines))
+
+    @classmethod
+    def _git(cls, *args):
+        subprocess.run(["git", "-C", cls.grepo, *args], capture_output=True,
+                       check=True)
+
+    @classmethod
+    def _write_finding(cls, name, text):
+        with open(os.path.join(cls.findings, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    def _svc(self):
+        from mlir_repomap.impact import ImpactService
+        return ImpactService(self.repo, findings_dir=self.findings,
+                             git_repo=self.grepo, docs_dir=self.docs)
+
+    def test_review_query_joins_all_layers(self):
+        svc = self._svc()
+        try:
+            r = svc.review("simple-fold")
+        finally:
+            svc.close()
+        self.assertEqual(r["pass"]["id"], "pass:simple-fold")
+        self.assertEqual(len(r["review_records"]), 1)
+        self.assertIn("Protected invariants", r["review_records"][0]["record"])
+        ids = {f["id"]: f["matched_via"] for f in r["findings"]}
+        self.assertEqual(ids.get("FI-001"), ["pass-field"])
+        self.assertEqual(ids.get("FV-002"), ["entity_refs"])
+        guards = [(g["kind"], g["constraint"]) for g in r["invariant_guards"]]
+        self.assertIn(("legality-guard", "constraint:lib/SimpleFold.cpp:7"),
+                      guards)
+
+    def test_review_recent_impact_integration(self):
+        self._write_pass(["  if (dim > 8) {", "    return signalPassFailure();", "  }"])
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "relax fold guard")
+        svc = self._svc()
+        try:
+            r = svc.review("simple-fold")
+        finally:
+            svc.close()
+        imp = {i["finding"]: i for i in r["recent_impact"]}
+        self.assertIn("FI-001", imp)
+        types = {s["type"] for s in imp["FI-001"]["signals"]}
+        self.assertIn("file-commits", types)
+        self.assertIn("constraint-diff", types)
+
+    def test_evidence_catalog(self):
+        svc = QueryService(self.repo)
+        try:
+            r = svc.get_evidence("constraint:lib/SimpleFold.cpp:7")
+            self.assertTrue(r["evidence_rows"])
+            self.assertEqual(r["entity"]["id"],
+                             "constraint:lib/SimpleFold.cpp:7")
+            self.assertTrue(r["recent_history"],
+                            "SimpleFold.cpp has commits in the harness repo")
+            self.assertEqual(r["referenced_by_findings"], [])
+            # positive linkage: a finding citing this constraint by ref+file
+            fdir = os.path.join(self.repo, "docs", "compiler-architecture",
+                                "findings")
+            os.makedirs(fdir, exist_ok=True)
+            fpath = os.path.join(fdir, "FI-CAT.yaml")
+            with open(fpath, "w", encoding="utf-8") as fh:
+                fh.write('''\
+finding:
+  id: FI-CAT
+  category: correctness
+  pass: simple-fold
+  statement: >-
+    Guard referenced by a finding.
+  evidence:
+    - file: lib/SimpleFold.cpp
+      lines: 6-9
+      ref: constraint:lib/SimpleFold.cpp:7
+  reasoning: >-
+    Agent reasoning layer.
+  status: open
+  created_at: 2026-09-05
+''')
+            try:
+                r2 = svc.get_evidence("constraint:lib/SimpleFold.cpp:7")
+                self.assertEqual(len(r2["referenced_by_findings"]), 1)
+                self.assertEqual(r2["referenced_by_findings"][0]["id"], "FI-CAT")
+                self.assertIn("evidence.ref",
+                              r2["referenced_by_findings"][0]["matched_via"])
+            finally:
+                os.remove(fpath)
+                os.rmdir(fdir)
+        finally:
+            svc.close()
+
+    def test_missing_artifact_negative(self):
+        empty_docs = os.path.join(self.tmp, "empty-docs")
+        empty_findings = os.path.join(self.tmp, "empty-findings")
+        os.makedirs(empty_docs)
+        os.makedirs(empty_findings)
+        from mlir_repomap.impact import ImpactService
+        svc = ImpactService(self.repo, findings_dir=empty_findings,
+                            git_repo=self.grepo, docs_dir=empty_docs)
+        try:
+            r = svc.review("simple-fold")
+        finally:
+            svc.close()
+        self.assertEqual(r["review_records"], [])
+        self.assertEqual(r["findings"], [])
+        self.assertTrue(any("no review memory found" in n for n in r["notes"]))
+        svc2 = QueryService(self.repo)
+        try:
+            cat = svc2.get_evidence("pass:does-not-exist")
+            self.assertIsNone(cat["entity"])
+            self.assertEqual(cat["evidence_rows"], [])
+            self.assertEqual(cat["referenced_by_findings"], [])
+        finally:
+            svc2.close()

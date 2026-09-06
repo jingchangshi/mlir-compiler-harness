@@ -28,7 +28,7 @@ to re-index; workflows must refresh before reasoning if stale).
 | `references <name>` | get_references(name) | edges/mentions of the entity grouped by kind |
 | `tests <pass-or-pipeline>` | get_tests(name) | covering tests w/ RUN lines + confidence |
 | `changed [base]` | get_changes(base=None) | files changed vs index (and vs base ref if given) + impacted entities |
-| `evidence <node-or-edge-id>` | get_evidence(id) | all evidence rows with file:line + snippet |
+| `evidence <node-or-edge-id>` | get_evidence(id) | evidence catalog (Phase 17): entity + evidence rows with file:line + snippet + findings referencing it (matched structurally via evidence.ref / evidence.file / entity_refs) + recent git history of the entity's primary file. No embedding, no similarity |
 | `pattern-owner <pattern>` | pattern_owner(name) | provenance chain: pattern -> defining pattern-set function(s) -> pass(es), with evidence |
 | `pipeline-builder <pipeline>` | pipeline_builder(name) | file-qualified builder function(s), sub-pipeline calls, callers |
 | `attribute <name>` | get_attribute(name) | attribute provenance: referencing files (heuristic) + confirmed creating pass classes |
@@ -41,6 +41,7 @@ to re-index; workflows must refresh before reasoning if stale).
 | `findings check [--since REF] [--dir D] [--git-repo R] [--format text\|json]` | FindingService.check | git-aware drift report over finding evidence: commits touching each evidence file since the finding's baseline (review.baseline_commit or --since), snippet-presence verification ("evidence changed"), and a `needs_review` verdict per finding in the goal format ("Finding <id> / possibly affected by commit … / Needs review"). Never mutates finding status; external-repo evidence (a `repo:` field) is noted, not drift-checked |
 | `findings show <id>` | FindingService.show | full finding record including history and regression memory |
 | `finding-impact <id> [--dir D] [--git-repo R] [--since REF]` | ImpactService.impact | semantic finding impact (ADR-022): graph-resolved `entity_refs` + per-evidence-file git drift + constraint evolution diff + TEST_COVERS_PASS signal → deterministic review-scope suggestion. Never mutates finding status; unresolvable refs and missing baselines are explicit uncertainty; a no-signal result is reported as a negative result |
+| `review <pass> [--dir D] [--docs-dir D] [--git-repo R] [--since REF]` | ImpactService.review | Compiler Review Memory (ADR-023): pass identity + dossier Compiler Review records (quoted verbatim from `docs/compiler-architecture/passes/*.md`) + findings linked by pass-field or entity_refs + deterministic invariant guards (constraints) + per-finding recent impact signals. Deterministic; no reasoning generated; empty memory is an explicit note, not an error |
 | `constraint-diff <file> --since REF` | impact.constraint_diff | structural constraint-set diff for one file between a base commit and the worktree (added / removed / moved guards, unchanged count) with classification labels ("possible weakening (guard(s) removed)" etc.) — structural only, never a semantic judgment |
 
 Token discipline: every command returns compact JSON with `file:line` pointers, never file

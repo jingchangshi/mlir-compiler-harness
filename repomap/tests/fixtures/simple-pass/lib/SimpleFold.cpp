@@ -3,6 +3,9 @@ namespace {
 struct SimpleFoldPass : public PassWrapper<SimpleFoldPass, OperationPass<func::FuncOp>> {
   StringRef getArgument() const override { return "simple-fold"; }
   void runOnOperation() override {
+    if (emptyFoldLimitExceeded) {
+      return signalPassFailure();
+    }
     RewritePatternSet patterns(&getContext());
     patterns.add<FoldSimplePattern>(&getContext());
   }

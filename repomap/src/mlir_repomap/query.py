@@ -3,6 +3,7 @@
 CLI / MCP / Python frontends must contain no business logic, only this module.
 """
 import json
+import os
 
 from . import model, repo
 from .store import Store
@@ -594,6 +595,9 @@ class QueryService:
                                 "items": cons.get("constraints", [])[:12]}}
 
     def get_evidence(self, ident):
+        """Evidence catalog (Phase 17): entity + evidence rows + findings that
+        reference it + recent git history of its location. Structural matching
+        only — no embedding, no similarity."""
         if ident.startswith("file:"):
             return {"evidence": []}
         node = self._node_or_none(ident)
@@ -606,4 +610,42 @@ class QueryService:
         diags = self.store.db.execute(
             "SELECT message FROM diagnostics WHERE file=?",
             (ident[5:] if ident.startswith("file:") else "",)).fetchall()
-        return {"id": ident, "edges": out, "diagnostics": [d[0] for d in diags]}
+        result = {"id": ident, "entity": node, "evidence_rows": out,
+                  "referenced_by_findings": [], "recent_history": [],
+                  "diagnostics": [d[0] for d in diags]}
+        # evidence-point catalog: findings referencing this entity (Phase 17)
+        if node:
+            fdir = os.path.join(self.root, "docs", "compiler-architecture",
+                                "findings")
+            try:
+                from .findings import FindingService
+                findings, _ = FindingService(fdir, repo=self.root).load()
+            except Exception:
+                findings = []
+            for f in findings:
+                d = f["data"]
+                via = []
+                for ev in d.get("evidence", []):
+                    if ev.get("ref") == ident:
+                        via.append("evidence.ref")
+                    elif node.get("file") and ev.get("file") == node.get("file"):
+                        via.append("evidence.file")
+                for item in d.get("entity_refs") or []:
+                    kind, name = list(item.items())[0]
+                    if ident == f"{kind}:{name}" or name == node.get("name"):
+                        via.append("entity_refs")
+                if via:
+                    result["referenced_by_findings"].append(
+                        {"id": d.get("id"), "status": d.get("status"),
+                         "file": f["file"], "matched_via": sorted(set(via))})
+            # recent history: commits touching the entity's primary file
+            if node.get("file"):
+                from .repo import _git
+                log = _git(self.root, "log", "--format=%h%x1f%ad%x1f%s",
+                           "--date=short", "-5", "--", node["file"]) or ""
+                result["recent_history"] = [
+                    {"sha": s, "date": dt, "subject": subj}
+                    for s, dt, subj in (ln.split("\x1f", 2)
+                                        for ln in filter(None,
+                                                         log.splitlines()))]
+        return result

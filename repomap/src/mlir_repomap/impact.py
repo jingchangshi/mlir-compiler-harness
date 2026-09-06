@@ -13,6 +13,7 @@ Uncertainty (unresolvable refs, missing baseline) is explicit.
 """
 
 import os
+import re
 from collections import Counter, defaultdict
 
 from . import model
@@ -83,11 +84,13 @@ def constraint_diff(repo, relpath, since):
 class ImpactService:
     """finding-impact: entity-aware impact report for one finding."""
 
-    def __init__(self, root, findings_dir=None, git_repo=None):
+    def __init__(self, root, findings_dir=None, git_repo=None, docs_dir=None):
         self.root = root
         self.findings_dir = findings_dir or os.path.join(
             root, "docs", "compiler-architecture", "findings")
         self.git_repo = git_repo or root
+        self.docs_dir = docs_dir or os.path.join(
+            root, "docs", "compiler-architecture")
         self._query_svc = None
 
     def _query(self):
@@ -243,3 +246,112 @@ class ImpactService:
             out["note"] = ("no impact signals since baseline "
                            "(files unchanged); negative result is a result")
         return out
+
+    # ---- Compiler Review Memory (Phase 17, ADR-023) -----------------------
+
+    @staticmethod
+    def _review_records(docs_dir, pass_arg):
+        """Deterministically extract Compiler Review record sections from
+        dossier docs matching the pass (filename stem or content mention).
+        Records are quoted verbatim — agent-layer artifacts, never regenerated.
+        """
+        records, notes = [], []
+        pdir = os.path.join(docs_dir, "passes")
+        if not os.path.isdir(pdir):
+            return records, [f"no dossier directory: {pdir}"]
+        for name in sorted(os.listdir(pdir)):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(pdir, name)
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+            stem = name[:-3]
+            if stem != pass_arg and stem not in pass_arg \
+                    and pass_arg not in text:
+                continue
+            m = re.search(r"^#{1,6} .*Compiler Review.*$", text, re.M)
+            if not m:
+                continue
+            nxt = re.search(r"^# ", text[m.end():], re.M)
+            end = m.end() + (nxt.start() if nxt else len(text) - m.end())
+            records.append({
+                "dossier": path,
+                "line_start": text[:m.start()].count("\n") + 1,
+                "record": text[m.start():end].strip()})
+        return records, notes
+
+    def review(self, pass_name, since=None):
+        """One-stop review memory for a pass (Phase 17, ADR-023): graph identity
+        + verbatim review records + linked findings + deterministic constraint
+        records + recent impact signals. Deterministic and evidence-backed; no
+        reasoning is generated."""
+        q = self._query()
+        r = q._resolve_pass(pass_name)
+        if r is None or (isinstance(r[1], dict) and "error" in r[1]):
+            return r[1] if isinstance(r[1], dict) else {"error": "not found"}
+        nid, node = r
+        arg = node.get("name") or nid.split(":", 1)[-1]
+        out = {"pass": node, "review_records": [], "findings": [],
+               "invariant_guards": [], "evidence_points": [],
+               "recent_impact": [], "notes": []}
+        # 1. historical review records (doc layer, quoted verbatim)
+        docs_dir = self.docs_dir
+        recs, notes = self._review_records(docs_dir, arg)
+        out["review_records"] = recs
+        out["notes"].extend(notes)
+        # 2. linked findings: pass field match OR entity_refs naming this pass
+        fs = FindingService(self.findings_dir, repo=self.git_repo)
+        findings, diags = fs.load()
+        out["notes"].extend(diags)
+        linked = []
+        for f in findings:
+            d = f["data"]
+            via = []
+            if str(d.get("pass", "")).lower() == arg.lower() or \
+                    str(d.get("pass", "")) == nid:
+                via.append("pass-field")
+            for item in d.get("entity_refs") or []:
+                kind, name = list(item.items())[0]
+                if kind == "pass" and str(name).lower() in (arg.lower(), nid):
+                    via.append("entity_refs")
+            if via:
+                linked.append({"file": f["file"], "id": d.get("id"),
+                               "category": d.get("category"),
+                               "status": d.get("status"),
+                               "statement": d.get("statement"),
+                               "regression": d.get("regression"),
+                               "matched_via": via})
+        out["findings"] = linked
+        # 3. deterministic invariant guards (graph facts) + evidence points
+        for e in self._impact_evidence(q, nid):
+            out["invariant_guards"].append(e)
+        # 4. recent impact signals per linked finding (Phase 16 machinery)
+        for f in linked:
+            imp = self.impact(f["id"], since=since)
+            if imp.get("error"):
+                out["notes"].append(f"impact for {f['id']}: {imp['error']}")
+                continue
+            sig = imp.get("changed_signals") or []
+            out["recent_impact"].append({
+                "finding": f["id"],
+                "signals": [{"type": s.get("type"),
+                             "file": s.get("file"),
+                             "classification": s.get("classification"),
+                             "total": s.get("total"),
+                             "commits": [c.get("sha") for c in
+                                         (s.get("commits") or [])[:3]]}
+                            for s in sig],
+                "uncertainty": imp.get("uncertainty")})
+        if not out["review_records"] and not out["findings"]:
+            out["notes"].append(
+                "no review memory found for this pass (no dossier record, no "
+                "findings) — a negative result, not an error")
+        return out
+
+    def _impact_evidence(self, q, nid):
+        """Deterministic constraint records of the pass, as evidence points."""
+        points = []
+        for e in q._evidence_summary(q.store.edges_from(nid, model.HAS_CONSTRAINT)):
+            points.append({"constraint": e["dst"], "kind": e["props"].get("kind"),
+                           "evidence": e["evidence"]})
+        return points

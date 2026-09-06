@@ -424,3 +424,37 @@ TTL-001 single-repo (attribute exact / cross-repo pass uncertainty); tests 38/38
 Consequences: INDEXER_VERSION 46 (gtest nodes + evidence confidence upgrade); the
 confidence ladder gains `exact` (heuristic < inferred < exact < confirmed); per-file
 diagnostics are cleared on successful re-extraction (stale diagnostics hygiene).
+
+## ADR-023 (2026-09-05, accepted) — Compiler review memory: verbatim records, structural retrieval, no generated reasoning
+
+Context: review knowledge (Phase 13 records, Phase 14 findings, constraints, Phase 16
+impact) existed but was spread across four surfaces; an agent had to re-assemble it
+before every analysis (docs/validation/phase17/review-memory-gap.md).
+Decision: (1) `review <pass>` joins — in one deterministic query — the graph pass
+identity, the dossier's Compiler Review record extracted VERBATIM from
+`docs/compiler-architecture/passes/*.md` (located by filename stem or content mention
+of the pass arg; multiple matches are all returned), findings linked by pass-field or
+entity_refs, the pass's HAS_CONSTRAINT records as the deterministic invariant guards,
+and per-finding recent impact signals (Phase 16, own baseline or --since). Records are
+quoted, never regenerated; empty memory is an explicit note. (2) The `evidence`
+command becomes an evidence catalog: entity + evidence rows + findings referencing the
+entity (structural matches only: evidence.ref, evidence.file, entity_refs) + recent
+commits touching the entity's file. (3) Data ownership unchanged: the graph owns
+facts, the dossier/findings docs own review reasoning, the engine only retrieves and
+joins; lifecycle stays human-controlled (ADR-019/020).
+Rejected: **embedding memory / semantic similarity** (retrieval must stay
+structurally explainable — matches are name/ref equality); **automatic review**
+(the engine never writes review records or updates them from code changes — a new
+review is an agent workflow run); **cross-repo validation** (carried from ADR-022:
+review resolves against one index; cross-repo artifacts surface as notes/uncertainty).
+Limitations: dossier location relies on the documented docs layout convention; record
+extraction is header-based ("# … Compiler Review …" to the next top-level header);
+evidence-file matching can over-match when several entities share one file (matched_via
+is always shown so the agent can judge).
+Evidence: docs/validation/phase17/ — review AutoVectorizeV2 returns the verifier
+invariant + fallback history (fa682a1a3) + guard evolution in one call; review
+MergeVecScope returns the unguarded single-use assumption (record) + verify guards
+(:1422/:1625); evidence catalog links AV2-001 to constraint:…:1406 via evidence.ref
+with fa682a1a3 as recent history; tests 42/42.
+Consequences: no schema change, no INDEXER_VERSION bump; query-api gains `review` and
+the extended `evidence` catalog; workflows consume them (pass-analysis step 0, lens 1g).

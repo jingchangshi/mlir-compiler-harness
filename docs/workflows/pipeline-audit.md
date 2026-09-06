@@ -101,6 +101,17 @@ plus guard text replaces repository-wide searching.
    findings whose evidence has no drift are reported as clean (a negative result is a
    result).
 
+1g. **Historical contract memory lens** — before auditing the current stage
+   ordering, ask what previous reviews recorded about these stages:
+   `mlir-repomap review <pass>` per stage returns the dossier's review record
+   (previous contracts and protected invariants, quoted verbatim) and the linked
+   findings with their recent impact signals. Output per stage triple:
+   *previous contract* (from the review record / invariant guards), *current
+   change* (constraint-diff or file-commits since the finding baseline — Phase 16
+   machinery), *review requirement* (which of the previously protected invariants
+   the current change touches and which tests to re-run). The lens quotes memory;
+   it does not re-review or update it (ADR-023).
+
 2. **Hidden invariants / cross-pass state (attribute contracts)** — pass options or IR
    markers that one stage writes and another reads. For every annotation/metadata/marker
    attribute discovered in the stages, run

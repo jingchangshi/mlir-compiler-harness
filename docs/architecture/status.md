@@ -85,6 +85,14 @@ remains (`populate*` chasing) and did not block the workflows.
   verifier completeness, annotation name validation, cross-dialect flatten contract);
   workflows 7f + lens 1x; no engine changes.
 
+- Phase 17 review memory & evidence retrieval (ADR-023, `docs/validation/phase17/`):
+  `review <pass>` joins graph identity + verbatim dossier review records + linked
+  findings + invariant guards + per-finding impact signals in one query; `evidence`
+  becomes an evidence catalog (referencing findings + recent history, structural
+  matching only); workflows step 0 (memory context) + lens 1g (historical contract
+  memory); embedding/automatic-review/cross-repo-validation explicitly rejected;
+  tests 42/42.
+
 - Phase 16 semantic finding impact analysis (ADR-022, `docs/validation/phase16/`):
   findings gain `entity_refs` (graph-validated references, never node-creating);
   `finding-impact <id>` joins entities + file drift + constraint evolution diff +
@@ -128,5 +136,4 @@ remains (`populate*` chasing) and did not block the workflows.
 
 ## Next recommended phase
 
-See roadmap.md — finding-resolution assists are partially delivered by Phase 16
-(constraint diff + test signal); the remaining candidates are ranked there (ADR-022).
+See roadmap.md — review memory is queryable; remaining candidates ranked there (ADR-023).

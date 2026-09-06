@@ -58,6 +58,9 @@ def main(argv=None):
     p = sub.add_parser("pass-intent"); p.add_argument("name")
     p = sub.add_parser("pass-constraints"); p.add_argument("name")
     p = sub.add_parser("index"); p.add_argument("--full", action="store_true")
+    p = sub.add_parser("review"); p.add_argument("name")
+    p.add_argument("--dir"); p.add_argument("--docs-dir")
+    p.add_argument("--git-repo"); p.add_argument("--since")
     fi = sub.add_parser("finding-impact")
     fi.add_argument("fid"); fi.add_argument("--dir"); fi.add_argument("--git-repo")
     fi.add_argument("--since")
@@ -81,6 +84,23 @@ def main(argv=None):
         from .impact import constraint_diff
         result = constraint_diff(root, args.path, args.since)
         print(json.dumps({"command": "constraint-diff", "result": result},
+                         indent=1, default=str))
+        return 0
+
+    if args.cmd == "review":
+        from .impact import ImpactService
+        svc = ImpactService(
+            root,
+            findings_dir=args.dir or os.path.join(
+                root, "docs", "compiler-architecture", "findings"),
+            git_repo=args.git_repo or root,
+            docs_dir=args.docs_dir or os.path.join(
+                root, "docs", "compiler-architecture"))
+        try:
+            result = svc.review(args.name, since=args.since)
+        finally:
+            svc.close()
+        print(json.dumps({"command": "review", "result": result},
                          indent=1, default=str))
         return 0
 

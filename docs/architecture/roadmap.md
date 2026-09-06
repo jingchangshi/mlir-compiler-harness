@@ -1,18 +1,18 @@
 # Roadmap
 
-done: Phase 0-16 (…, attribute creator precision, semantic finding impact analysis;
-ADR-001..022). Repos: AscendNPU-IR (baseline), triton-ascend (hybrid), ecosystem layer
-over both.
+done: Phase 0-17 (…, semantic finding impact analysis, compiler review memory &
+evidence retrieval; ADR-001..023). Repos: AscendNPU-IR (baseline), triton-ascend
+(hybrid), ecosystem layer over both.
 
 current: none.
 
-next (based on Phase 16 evidence):
-1. **Review-scope watchlist delivery**: the impact reports for the 7 seeded findings
-   are concrete review leads for the target repos' teams (as Phase 13's unguarded
-   invariants were) — package as deliverables, which also validates practical value.
+next (based on Phase 17 evidence):
+1. **Review-scope watchlist delivery** (carried): the 7 seeded findings + their
+   review-memory entries are concrete leads for the target repos' teams.
 2. **EG-1 remainder / ecosystem persistence** (carried).
-3. C++-level attribute definitions (attrs without td AttrDef) still surface only as a
-   diagnostic; gtest linking is name-level only (stage 1).
+3. C++-level attribute definitions (attrs without td AttrDef) still surface only as
+   a diagnostic; gtest linking is name-level only (stage 1); dossier location relies
+   on the documented docs-layout convention.
 
 deferred (unchanged): MCP, clangd, runtime contract graph, attribute value semantics.
 

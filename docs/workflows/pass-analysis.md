@@ -29,22 +29,25 @@ query would have answered it (feeds the query-API review).
 
 ## Fixed analysis spine (all 13 steps, in order)
 
-0. **Compiler evolution impact check** — before analyzing the current code, check what
-   the harness already remembers about this pass and what changed underneath it:
-   (a) run `mlir-repomap findings list --pass-name <pass>` over the repo's findings
-   directory — *Does this pass have historical findings?* (open/in-progress items and
-   their categories) and *Were previous risks addressed?* (resolved/rejected entries,
-   plus regression-memory records); (b) for each finding touching this pass, run
-   `mlir-repomap finding-impact <id>` and read the deterministic join it returns:
-   existing finding + resolved entities + changed files/commits + constraint diff
+0. **Compiler memory context** — before analyzing the current code, load what the
+   harness already remembers, in one call: `mlir-repomap review <pass>`. It returns
+   the review-memory lookup (Phase 17): graph pass identity, the dossier's Compiler
+   Review record (verbatim), linked findings (pass-field or entity_refs), the
+   deterministic invariant guards (constraints), and per-finding recent impact
+   signals. Read it as: *what was previously reviewed? which invariants were
+   protected? which evidence supports them? what changed since last review?* — the
+   record quotes the answers, the engine never generates them. Then, for findings
+   the memory flags as drifted, run `mlir-repomap finding-impact <id>` (Phase 16)
+   for the per-finding join: existing finding + changed entities + constraint diff
    (added/removed/moved guards, structural classification) + linked tests
    (lit flag = exact, gtest name = heuristic). Compose the **review guidance** from
-   those four inputs: which areas to review first (constraint areas of the affected
-   pass), which tests to re-run, and which findings are stale-flagged. An open
-   finding must be revisited in steps 12/13 and the review record (7f) must state
-   whether the current code still exhibits it; status updates remain a manual,
-   reasoned edit of the finding document (ADR-020) — the impact report never
-   advances a lifecycle.
+   these layers: which areas to review first (constraint areas of the affected
+   pass), which tests to re-run, which findings are stale-flagged. An open finding
+   must be revisited in steps 12/13 and the review record (7f) must state whether
+   the current code still exhibits it; status updates remain a manual, reasoned edit
+   of the finding document (ADR-020) — memory and impact reports never advance a
+   lifecycle. When the memory is empty, that is a valid answer: state "no prior
+   review memory" and proceed with the fresh analysis below.
 1. **Pass identity** — arg, td class, summary, cpp class; note which identity came from
    evidence vs heuristic.
 2. **Registration** — `let constructor` factory, any PassRegistration, option definitions.
