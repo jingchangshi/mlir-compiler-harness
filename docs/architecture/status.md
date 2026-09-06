@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-06 (Phases 0–18 complete)
+Updated: 2026-09-06 (Phases 0–20 complete)
 
 ## Implemented
 
@@ -137,6 +137,13 @@ remains (`populate*` chasing) and did not block the workflows.
   version's absent `make_ttgir` is an explicit not-found result. C++ pipeline regression
   remains clean; tests cover direct/list/binding/ambiguity/missing-evidence cases.
 
+- Phase 20 CompilerDev Harness adapter contract (`docs/validation/phase20/`): a thin,
+  read-only consumer contract for `review`, `finding-impact`, `pipeline-stages` and
+  `evidence`; task-specific query sequences; and a stdlib-validated non-sensitive
+  feedback artifact. Feedback captures knowledge-system usage gaps rather than compiler
+  design findings, so it is neither indexed nor lifecycle-managed. No Agent runtime,
+  DeepSeek Harness integration or graph-model change is part of this phase.
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
@@ -150,12 +157,12 @@ remains (`populate*` chasing) and did not block the workflows.
   reference tool flags, not builder names.
 - Short pass names may be inherently ambiguous across dialects (engine returns explicit
   ambiguity; agents must ask).
-- No MCP, no agent skills, no clangd (deliberately deferred).
+- No MCP, no Agent runtime, no clangd (deliberately deferred).
 - Findings: commit attribution is file-granular; `--since` needed when findings lack a
   recorded baseline; constraint line anchors can be off by one (snippet check tolerates).
   External-repository evidence is explicitly not drift-checked by a single-repo query.
 
 ## Next recommended phase
 
-See roadmap.md — Phase 18 evidence ranks only deeper semantic extraction for evaluation;
-review memory is already queryable (ADR-023).
+See roadmap.md — compiler knowledge consumption now has a documented adapter boundary;
+future runtime work requires real-task feedback outside this repository.

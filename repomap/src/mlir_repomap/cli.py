@@ -22,6 +22,17 @@ def _findings_text(result):
     return "\n".join(lines)
 
 
+def _index_summary(root):
+    """Return the stable index envelope shared by every read-only CLI command."""
+    from .query import QueryService
+    svc = QueryService(root)
+    try:
+        info = svc._index_info()
+        return {key: info[key] for key in ("head", "branch", "stale")}
+    finally:
+        svc.close()
+
+
 def main(argv=None):
     from . import index as index_mod
     from .query import QueryService
@@ -101,7 +112,8 @@ def main(argv=None):
             result = svc.review(args.name, since=args.since)
         finally:
             svc.close()
-        print(json.dumps({"command": "review", "result": result},
+        print(json.dumps({"command": "review", "index": _index_summary(root),
+                          "result": result},
                          indent=1, default=str))
         return 0
 
@@ -115,7 +127,8 @@ def main(argv=None):
             result = svc.impact(args.fid, since=args.since)
         finally:
             svc.close()
-        print(json.dumps({"command": "finding-impact", "result": result},
+        print(json.dumps({"command": "finding-impact", "index": _index_summary(root),
+                          "result": result},
                          indent=1, default=str))
         return 0
 
@@ -198,14 +211,8 @@ def main(argv=None):
 
 
 
-    stale = None
-    svc2 = QueryService(root)
-    try:
-        stale = svc2._index_info()
-    finally:
-        svc2.close()
     print(json.dumps({"command": args.cmd,
-                      "index": {k: stale[k] for k in ("head", "branch", "stale")},
+                      "index": _index_summary(root),
                       "result": result}, indent=1, default=str))
     return 0
 

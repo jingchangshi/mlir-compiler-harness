@@ -49,6 +49,14 @@ Token discipline: every command returns compact JSON with `file:line` pointers, 
 contents; the agent opens only what it needs. `pass <name>` is the one-stop dossier for the
 pass-analysis workflow.
 
+## External CompilerDev consumption (Phase 20)
+
+`adapters/compiler-dev/` documents a stable, read-only consumption contract for
+`review`, `finding-impact`, `pipeline-stages`, and `evidence`. It is not an Agent runtime
+or a new query implementation: consumers retain `index.stale` and all explicit
+diagnostics, and any usage feedback remains outside both graph and finding layers. See
+[`adapters/compiler-dev/query-contract.md`](../../adapters/compiler-dev/query-contract.md).
+
 ## `pass <name>` dossier (contract)
 
 ```json
