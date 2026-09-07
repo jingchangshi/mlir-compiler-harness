@@ -12,6 +12,11 @@
 `review` 的 retrieval 结果说成新生成的设计判断，也不得因 impact suggestion 自动关闭或
 升级 finding。
 
-如果消费者为找到 verifier 或其他关键位置而在 query 已返回的范围外重新搜索源码，应在
-独立 feedback 中记录它。这是对知识系统覆盖的观察，不是 compiler finding，也不会进入
-graph。
+每个任务先做一个明确、可审核的 route decision：`knowledge_expected=false` 时可以正确 skip；
+仅当 `knowledge_expected=true` 且 `compiler_knowledge_calls=0` 时，v2 feedback 才可记录
+`adoption-missed`。这是候选使用观察，不能由 validator 或 runtime 推导 compiler 结论。
+
+如果消费者为找到 verifier 或其他关键位置而在 query 已返回的范围外重新搜索源码，应在独立
+feedback 中记录它。这是对知识系统覆盖的观察，不是 compiler finding，也不会进入 graph。生产
+闭环为：CompilerDev runtime observation → candidate feedback → 人工审核 → curated feedback →
+architecture evolution evidence；其中没有自动晋级或自动架构变更。

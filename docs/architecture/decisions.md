@@ -485,3 +485,38 @@ binding-to-C++ association, ambiguity and missing evidence; triton-ascend expose
 Consequences: INDEXER_VERSION 48 forces a full re-index; C++ pipeline behavior remains
 unchanged, and both graph/review/finding ownership boundaries from ADR-019..023 remain
 intact.
+
+## ADR-025 (2026-09-07, accepted) — Compiler Knowledge Feedback Protocol v2
+
+背景：Phase 20 的 feedback v1 能表达已经执行的 `review`、`finding-impact`、
+`pipeline-stages` 或 `evidence` 查询是否有帮助，却因 `query` 必填而不能表达真实生产会话中
+“任务应使用 compiler knowledge、但 Agent 完全没有调用”的 adoption 缺口。consumer repo 已能
+记录每次查询的去敏统计并离线分析会话，因此缺的是稳定的跨仓反馈契约，而不是新的 compiler graph
+能力。
+
+决策：(1) 保留 `schema_version: 1` 不变；新增严格的 v2。v2 以四种 observation kind 表达
+`query-sufficient`、`query-insufficient`、`query-operational` 和 `adoption-missed`。前三者必须
+有 query；后者统一使用 `query: null`，并且只能在 `route.knowledge_expected=true` 与
+`usage.compiler_knowledge_calls=0` 时成立。`knowledge_expected=false` 且零调用是正确 skip。
+(2) v2 task 可带 `classification`，机器判定必须显式标记 `source: heuristic`；route 记录是否预期
+使用知识和该判断的置信度，但 validator 只检查字段一致性，绝不推断真实 Agent 行为。(3) v2 只允许
+最小 usage counters/step 与 operational boolean/duration；不保存命令正文、结果正文或 error 文本。
+(4) `origin: automatic|agent|curated` 区分生命周期：automatic 和 agent 是 candidate，只有人工
+去敏审核后的 curated 才可成为 architecture evolution 的人工证据，且没有自动晋级。(5) v2 的严格
+allowed-fields 和 `sensitivity.contains_sensitive_content=false` 共同拒绝 prompt、transcript、source
+text、messages、secret/API key 和个人信息字段。
+
+边界：feedback 仍不进入 graph、不创建 node、不修改 finding、不成为 compiler correctness evidence，
+也不存入 SQLite。compiler graph 只保留确定性 compiler facts；finding 保留设计/review 知识；feedback
+只是知识系统使用观察。session 与 raw telemetry 由 consumer repo 持有，因为它们是运行时访问控制数据，
+既不是可复现的 compiler source fact，也不属于本仓的索引责任。
+
+理由：adoption-missed 使“未使用”成为可审核的候选观察，而 positive feedback 同样重要——它能证明
+一个确定性查询已减少 discovery search，避免只从失败样本演进架构。automatic candidate 若直接驱动
+architecture mutation，会把启发式路由、会话偶然性或模型行为伪装成 compiler knowledge；因此必须保持
+人工 curated 边界。保存 prompt/transcript/source content 会扩大敏感面、复制 consumer session 数据，
+并破坏 compact、可共享的协议目标。
+
+后果：`validate_feedback` 同时验证 v1 与 v2；v1 已提交 corpus 继续通过，v2 覆盖四种有效观察和
+query/route/usage/privacy 的无效组合。下一步是 consumer repo 的 CompilerDev Production Knowledge
+Observation Loop，而非 watchlist、MCP、clangd、embedding、runtime tracing 或 Test Coverage Extraction。

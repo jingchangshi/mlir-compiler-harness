@@ -8,12 +8,14 @@
 
 - [查询契约](query-contract.md)：四个可依赖的知识命令及其不确定性规则；
 - [工作流契约](workflow-contract.md)：按任务选择查询的只读序列；
-- [反馈工件](feedback-schema.md)：记录知识系统使用观察，**不等同于 finding**；
+- [反馈工件](feedback-schema.md)：v1/v2 的知识系统使用观察，**不等同于 finding**；
 - [演进方向](direction.md)：仅为未来 dsh creative mode 的方向，不实现外部 Harness。
 
 前置条件是目标 compiler repo 已完成 `mlir-repomap index --full`，且调用方在目标 repo
 中运行查询（或显式传递全局 `--repo`）。每次会话先读 `status` 的 `index.stale`：为
 `true` 时先刷新索引，再把结果用于工程推理。
 
-本目录遵守 adapter 薄层原则（ADR-010）：不复制 `docs/workflows/` 的方法论，不引入
-模型、MCP、DeepSeek Harness 依赖，也不修改 `repomap/` 的 compiler graph。
+本目录遵守 adapter 薄层原则（ADR-010、ADR-025）：不复制 `docs/workflows/` 的方法论，不引入
+模型、MCP、DeepSeek Harness 依赖，也不修改 `repomap/` 的 compiler graph。v2 feedback 可由
+consumer 自动形成 candidate；只有人类审核后的 `origin: curated` 才是 architecture evolution 的
+人工证据，绝不会自动修改 graph 或 finding。

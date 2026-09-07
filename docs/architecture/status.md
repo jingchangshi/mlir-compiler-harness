@@ -1,6 +1,6 @@
 # Architecture Status
 
-Updated: 2026-09-06 (Phases 0–20 complete)
+Updated: 2026-09-07 (Phases 0–21 complete)
 
 ## Implemented
 
@@ -144,6 +144,13 @@ remains (`populate*` chasing) and did not block the workflows.
   design findings, so it is neither indexed nor lifecycle-managed. No Agent runtime,
   DeepSeek Harness integration or graph-model change is part of this phase.
 
+- Phase 21 Compiler Knowledge Feedback Protocol v2 (ADR-025,
+  `docs/validation/phase21/`)：保持 v1 完整兼容，同时以 `observation_kind`、route decision、
+  最小非敏感 usage/operational 信号和 `origin` 定义可机器生成、可人工审核的反馈协议。
+  `adoption-missed` 仅在预期使用知识却零调用时成立；automatic/agent 是 candidate，只有
+  curated 可作为人工架构演进证据。feedback 仍不进入 graph、不建 node、不写 SQLite、不修改
+  finding；prompt、transcript、source text 与命令正文均被 v2 的严格字段边界排除。
+
 ## Current limitations
 
 - Pattern-set chains stop at helpers not taking `RewritePatternSet&`; attribute provenance
@@ -161,8 +168,10 @@ remains (`populate*` chasing) and did not block the workflows.
 - Findings: commit attribution is file-granular; `--since` needed when findings lack a
   recorded baseline; constraint line anchors can be off by one (snippet check tolerates).
   External-repository evidence is explicitly not drift-checked by a single-repo query.
+- Feedback v2 只验证记录的 schema consistency，不判断任务路由或 Agent 行为是否真实；生产
+  observation 的采集与人工 curated 审核仍由 consumer repo 负责。
 
 ## Next recommended phase
 
-See roadmap.md — compiler knowledge consumption now has a documented adapter boundary;
-future runtime work requires real-task feedback outside this repository.
+See roadmap.md — 下一阶段是 CompilerDev Production Knowledge Observation Loop；生产运行时
+工作必须由 consumer repo 基于真实任务反馈推进。
